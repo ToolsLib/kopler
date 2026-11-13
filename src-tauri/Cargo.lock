@@ -2089,6 +2089,7 @@ dependencies = [
  "chrono",
  "clipboard-win",
  "png",
+ "raw-window-handle",
  "rusqlite",
  "serde",
  "serde_json",
@@ -2105,6 +2106,7 @@ dependencies = [
  "uuid",
  "webview2-com",
  "windows-core",
+ "x11rb",
 ]
 
 [[package]]

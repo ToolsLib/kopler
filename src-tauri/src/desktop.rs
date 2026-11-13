@@ -509,9 +509,52 @@ fn request_action(app: &AppHandle, action: &str) {
         let _ = window.hide();
     }
 }
+#[cfg(target_os = "linux")]
+fn x11_main_active(window: &tauri::WebviewWindow) -> Option<bool> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use x11rb::{connection::Connection, protocol::xproto::ConnectionExt};
+    let native_id = match window.window_handle().ok()?.as_raw() {
+        RawWindowHandle::Xlib(handle) => u32::try_from(handle.window).ok()?,
+        RawWindowHandle::Xcb(handle) => handle.window.get(),
+        _ => return None,
+    };
+    let (connection, screen) = x11rb::connect(None).ok()?;
+    let root = connection.setup().roots.get(screen)?.root;
+    let atom = connection
+        .intern_atom(true, b"_NET_ACTIVE_WINDOW")
+        .ok()?
+        .reply()
+        .ok()?
+        .atom;
+    let reply = connection
+        .get_property(
+            false,
+            root,
+            atom,
+            x11rb::protocol::xproto::AtomEnum::WINDOW,
+            0,
+            1,
+        )
+        .ok()?
+        .reply()
+        .ok()?;
+    let active_id = reply.value32()?.next()?;
+    Some(active_id == native_id)
+}
+
+fn main_has_focus(window: &tauri::WebviewWindow) -> bool {
+    // X11's passive hotkey grab temporarily clears GTK's focus flag. The window
+    // manager's active-window property still identifies the foreground app.
+    #[cfg(target_os = "linux")]
+    if let Some(active) = x11_main_active(window) {
+        return active;
+    }
+    window.is_focused().unwrap_or(false)
+}
+
 fn toggle_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
-        if window.is_visible().unwrap_or(false) && window.is_focused().unwrap_or(false) {
+        if window.is_visible().unwrap_or(false) && main_has_focus(&window) {
             request_action(app, "hide");
         } else {
             show_main(app);

@@ -12,7 +12,7 @@ crate-type = ["lib"]
 
 [features]
 default = ["desktop"]
-desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-global-shortcut", "dep:tauri-plugin-clipboard-manager", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener", "dep:tauri-plugin-window-state", "dep:webview2-com", "dep:windows-core", "dep:clipboard-win"]
+desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-global-shortcut", "dep:tauri-plugin-clipboard-manager", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener", "dep:tauri-plugin-window-state", "dep:webview2-com", "dep:windows-core", "dep:clipboard-win", "dep:raw-window-handle", "dep:x11rb"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [], optional = true }
@@ -38,6 +38,10 @@ tauri-plugin-window-state = { version = "2", optional = true }
 webview2-com = { version = "0.39", optional = true }
 windows-core = { version = "0.62", optional = true }
 clipboard-win = { version = "5.4", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+raw-window-handle = { version = "0.6", optional = true }
+x11rb = { version = "0.13", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

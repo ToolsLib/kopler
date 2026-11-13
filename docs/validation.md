@@ -148,6 +148,8 @@ Linux artifacts staged under `.release/0.1.0/linux/`:
 
 These local Linux packages were built on Debian 12. The hosted workflow targets Ubuntu 22.04; its outputs have not been produced or tested yet. The AppImage includes desktop dependencies, explaining its larger size. Each platform staging folder includes `SHA256SUMS.txt`.
 
+CI follow-up, 14 November: updated fixed-size pixel loops for Rust 1.100 Clippy, corrected macOS architecture verification to inspect the app inside the finished DMG, and fixed an X11 shortcut race where the keyboard grab temporarily cleared GTK's focus flag. X11 now uses the window manager's active-window property, with native focus as a fallback on other backends. The Linux smoke check shares its display environment with D-Bus services, waits for a real capture draft to persist, and checks focused hide, background focus, hidden reveal, and single-instance behavior. Fresh isolated offline Linux runs exercised those states successfully. Hosted workflow outcomes are linked in GitHub Actions above.
+
 ## Artifact hashes
 
 SHA-256 of the latest Windows artifacts, rebuilt through `npm run release:windows` with the neutral charcoal dark theme, pencil/checkmark item editing, project tab context menus/middle-click removal and conditional confirmation, collapsible search/filter controls, the custom title bar, visible Delete actions and confirmation, image drag/drop, mixed clipboard copying, appearance settings, locally bundled Geist, inbox tabs, and selected-space capture routing (installer size: 2,182,943 bytes). The staged installer at `.release/0.1.0/windows/Kopler_0.1.0_windows_x64-setup.exe` has the same hash:
