@@ -1,0 +1,105 @@
+import type { Page } from '@playwright/test';
+
+// UI tests use the real invoke boundary with an isolated in-browser native adapter.
+// Storage invariants and transactions are tested independently against real SQLite in Rust.
+export async function desktopMock(page: Page) {
+  await page.addInitScript(() => {
+    type RecordValue = Record<string, any>;
+    const saved = localStorage.getItem('test-native-state');
+    const state: RecordValue = saved ? JSON.parse(saved) : {
+      items: [], projects: [], draft: { body: '', kind: 'note', projectId: null },
+      preferences: { shortcut: 'Ctrl+Shift+Space', projectId: null, filter: 'all', theme: 'system' },
+    };
+    state.images ??= {};
+    let callbackId = 0;
+    const callbacks = new Map<number, (payload: unknown) => void>();
+    const events: Record<string, number> = {};
+    const undo: Record<string, RecordValue> = {};
+    const w = window as unknown as RecordValue;
+    w.isTauri = true;
+    w.testNative = {
+      failSave: false, clipboard: 'clipboard text', clipboardImage: '', clipboardImageText: '', copied: '', copiedImage: '', copiedImages: [], finished: '',
+      window: { maximized: false, focused: true, minimized: false }, windowActions: [],
+      emit: (event: string, payload: unknown) => { const callback = callbacks.get(events[event]); callback?.({ event, id: events[event], payload }); },
+    };
+    const persist = () => localStorage.setItem('test-native-state', JSON.stringify(state));
+    const timestamp = () => new Date().toISOString();
+    w.__TAURI_INTERNALS__ = {
+      transformCallback(callback: (payload: unknown) => void) { const id = ++callbackId; callbacks.set(id, callback); return id; },
+      unregisterCallback(id: number) { callbacks.delete(id); },
+      async invoke(command: string, args: RecordValue = {}) {
+        if (command === 'plugin:event|listen') { events[args.event] = args.handler; return args.handler; }
+        if (command === 'plugin:event|unlisten' || command === 'ready') return;
+        if (command === 'window_state') return w.testNative.window;
+        if (command === 'window_control') {
+          w.testNative.windowActions.push(args.action);
+          if (args.action === 'toggle-maximize') w.testNative.window.maximized = !w.testNative.window.maximized;
+          if (args.action === 'minimize') Object.assign(w.testNative.window, {minimized:true, focused:false});
+          w.testNative.emit('window-state', w.testNative.window);
+          return w.testNative.window;
+        }
+        if (command === 'bootstrap') {
+          const error=localStorage.getItem('test-bootstrap-error');
+          if(error) throw error;
+          return { data: state, shortcutError: null, wayland: false, trayAvailable: true, dataPath: 'isolated-test-data' };
+        }
+        if (command === 'list_items') {
+          const q = args.query;
+          const filtered = state.items.filter((item: RecordValue) => (q.allProjects || item.projectId === q.projectId) && (q.filter === 'all' || (q.filter === 'completed' ? !!item.completedAt : !item.completedAt)) && item.body.toLowerCase().includes(q.search.toLowerCase())).sort((a: RecordValue, b: RecordValue) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+          return { items: filtered.slice(q.offset, q.offset + 60), total: filtered.length };
+        }
+        if (w.testNative.failSave && ['save_draft', 'update_item', 'create_item', 'delete_item', 'delete_project', 'save_view', 'set_theme', 'import_images'].includes(command)) throw 'Storage is full. Your text is retained.';
+        let result: unknown;
+        if (command === 'save_draft') state.draft = args.draft;
+        else if (command === 'save_view') Object.assign(state.preferences, { projectId: args.projectId, filter: args.filter });
+        else if (command === 'create_item') {
+          result = { ...args.input, id: crypto.randomUUID(), completedAt: null, createdAt: timestamp(), updatedAt: timestamp() };
+          state.items.push(result); state.draft = { body: '', kind: 'note', projectId: args.input.projectId, images: [] };
+        } else if (command === 'update_item') {
+          const item = state.items.find((item: RecordValue) => item.id === args.id);
+          Object.assign(item, args.input, { updatedAt: timestamp() }); result = item;
+        } else if (command === 'complete_item') {
+          const item = state.items.find((item: RecordValue) => item.id === args.id);
+          item.completedAt = args.completed ? timestamp() : null; result = item;
+        } else if (command === 'copy_item') {
+          const item = state.items.find((item: RecordValue) => item.id === args.id);
+          w.testNative.copied = item.body;
+          w.testNative.copiedImages = (item.images ?? []).map((image: RecordValue) => state.images[image.id]);
+          w.testNative.copiedImage = w.testNative.copiedImages[0] ?? '';
+        }
+        else if (command === 'copy_item_text') { w.testNative.copied=state.items.find((item: RecordValue)=>item.id===args.id).body; w.testNative.copiedImage='';w.testNative.copiedImages=[]; }
+        else if (command === 'read_clipboard' || command === 'import_images') {
+          const dataUrls = command === 'import_images' ? args.dataUrls : w.testNative.clipboardImage ? [w.testNative.clipboardImage] : [];
+          const images = [];
+          for (const data of dataUrls) {
+            const decoded = new Image(); decoded.src = data; await decoded.decode();
+            const id = crypto.randomUUID(); state.images[id] = data;
+            images.push({id,width:decoded.naturalWidth,height:decoded.naturalHeight});
+          }
+          result = command === 'import_images' ? images : images.length ? {type:'image',image:images[0],text:w.testNative.clipboardImageText || null} : {type:'text',text:w.testNative.clipboard};
+        }
+        else if (command === 'read_image') return state.images[args.id];
+        else if (command === 'copy_image') w.testNative.copiedImage = state.images[args.id];
+        else if (command === 'delete_item') {
+          const item = state.items.find((item: RecordValue) => item.id === args.id);
+          const token = crypto.randomUUID(); undo[token] = item;
+          state.items = state.items.filter((item: RecordValue) => item.id !== args.id); result = token;
+        } else if (command === 'undo_delete') { state.items.push(undo[args.token]); result = undo[args.token]; delete undo[args.token]; }
+        else if (command === 'create_project') { result = { id: crypto.randomUUID(), name: args.name.trim(), createdAt: timestamp() }; state.projects.push(result); }
+        else if (command === 'rename_project') state.projects.find((project: RecordValue) => project.id === args.id).name = args.name;
+        else if (command === 'delete_project') {
+          state.projects = state.projects.filter((project: RecordValue) => project.id !== args.id);
+          for (const item of state.items) if (item.projectId === args.id) item.projectId = null;
+          if (state.draft.projectId === args.id) state.draft.projectId = null;
+          if (state.preferences.projectId === args.id) state.preferences.projectId = null;
+        } else if (command === 'finish_window_action') w.testNative.finished = args.action;
+        else if (command === 'set_shortcut') state.preferences.shortcut = args.shortcut;
+        else if (command === 'set_theme') state.preferences.theme = args.theme;
+        else if (command === 'export_data') return state.items.length;
+        else if (command === 'import_data') return null;
+        else if (command !== 'open_data_directory') throw `Unknown native command: ${command}`;
+        persist(); return result;
+      },
+    };
+  });
+}

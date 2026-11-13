@@ -1,0 +1,164 @@
+name: Release builds
+run-name: Release candidates — ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Validate release versions, tag, and notes
+        id: version
+        run: npm run release:check
+      - run: npm run test:release
+
+  build:
+    needs: validate
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-2025
+            targets: x86_64-pc-windows-msvc
+          - platform: macos
+            os: macos-15
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - platform: linux
+            os: ubuntu-22.04
+            targets: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_INCREMENTAL: '0'
+      APPIMAGE_EXTRACT_AND_RUN: '1'
+      NO_STRIP: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+          targets: ${{ matrix.targets }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: release-${{ matrix.platform }}
+      - name: Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev libfuse2 file xvfb dbus-x11 xdotool openbox procps
+      - run: npm ci
+      - run: npm test
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --no-default-features --locked
+      - name: Windows interface tests
+        if: runner.os == 'Windows'
+        run: npm run test:e2e
+      - name: Build and stage native installers
+        run: npm run release:${{ matrix.platform }}
+      - name: Verify the universal macOS app
+        if: runner.os == 'macOS'
+        run: |
+          lipo -verify_arch arm64 x86_64 src-tauri/target/universal-apple-darwin/release/kopler
+          codesign --verify --deep --strict src-tauri/target/universal-apple-darwin/release/bundle/macos/Kopler.app
+      - name: Linux release launch and shortcut smoke check
+        if: runner.os == 'Linux'
+        env:
+          KOPLER_TEST_EXECUTABLE: ${{ github.workspace }}/src-tauri/target/release/kopler
+          KOPLER_SMOKE_DIR: ${{ runner.temp }}/kopler-release-smoke
+        run: dbus-run-session -- sh scripts/linux-smoke.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-${{ matrix.platform }}
+          path: .release/${{ needs.validate.outputs.version }}/${{ matrix.platform }}/*
+          if-no-files-found: error
+          include-hidden-files: true
+          compression-level: 0
+          retention-days: 30
+
+  assemble:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: packages-*
+          path: .release/combined
+          merge-multiple: true
+      - name: Require every platform and write combined checksums
+        run: node scripts/release.mjs verify-assets .release/combined
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-candidate-${{ needs.validate.outputs.version }}
+          path: .release/combined/*
+          if-no-files-found: error
+          include-hidden-files: true
+          compression-level: 0
+          retention-days: 30
+
+  draft-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [validate, assemble]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-candidate-${{ needs.validate.outputs.version }}
+          path: .release/combined
+      - run: node scripts/release.mjs verify-assets .release/combined
+      - name: Create or refresh a draft, never a published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/kopler-draft-status"; then
+            if [ "$(cat "$RUNNER_TEMP/kopler-draft-status")" != true ]; then
+              echo 'Refusing to modify an already published release.' >&2
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" .release/combined/* --clobber
+            gh release edit "$RELEASE_TAG" --draft --title "Kopler $RELEASE_VERSION" --notes-file "docs/releases/$RELEASE_TAG.md"
+          else
+            gh release create "$RELEASE_TAG" .release/combined/* --verify-tag --draft --title "Kopler $RELEASE_VERSION" --notes-file "docs/releases/$RELEASE_TAG.md"
+          fi

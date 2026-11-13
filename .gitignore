@@ -1,0 +1,52 @@
+# Dependencies, builds, generated schemas, and release packages
+node_modules/
+dist/
+.cache/
+.release/
+src-tauri/target/
+src-tauri/gen/
+*.tsbuildinfo
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.pdb
+*.app/
+
+# Tests, coverage, and logs
+test-results/
+playwright-report/
+coverage/
+*.log
+
+# Local environment and signing credentials
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Local databases and exports; source schemas and lockfiles remain tracked
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.db-wal
+*.db-shm
+/exports/
+
+# Machine-specific editor and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini

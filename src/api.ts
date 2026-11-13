@@ -1,0 +1,37 @@
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import type { Bootstrap, ClipboardContent, Draft, Filter, ImageRef, Item, ItemInput, Page, Project, Query, Theme, WindowControl, WindowState } from './types';
+
+export const desktop = isTauri();
+export const api = {
+  bootstrap: () => invoke<Bootstrap>('bootstrap'),
+  list: (query: Query) => invoke<Page>('list_items', { query }),
+  create: (input: ItemInput) => invoke<Item>('create_item', { input }),
+  update: (id: string, input: ItemInput) => invoke<Item>('update_item', { id, input }),
+  complete: (id: string, completed: boolean) => invoke<Item>('complete_item', { id, completed }),
+  delete: (id: string) => invoke<string>('delete_item', { id }),
+  undo: (token: string) => invoke<Item>('undo_delete', { token }),
+  createProject: (name: string) => invoke<Project>('create_project', { name }),
+  renameProject: (id: string, name: string) => invoke<void>('rename_project', { id, name }),
+  deleteProject: (id: string) => invoke<void>('delete_project', { id }),
+  saveDraft: (draft: Draft) => invoke<void>('save_draft', { draft }),
+  saveView: (projectId: string | null, filter: Filter) => invoke<void>('save_view', { projectId, filter }),
+  clipboard: () => invoke<ClipboardContent>('read_clipboard'),
+  importImages: (dataUrls: string[]) => invoke<ImageRef[]>('import_images', { dataUrls }),
+  image: (id: string, thumbnail = true) => invoke<string>('read_image', { id, thumbnail }),
+  copyImage: (id: string) => invoke<void>('copy_image', { id }),
+  copy: (id: string) => invoke<void>('copy_item', { id }),
+  copyText: (id: string) => invoke<void>('copy_item_text', { id }),
+  shortcut: (shortcut: string) => invoke<void>('set_shortcut', { shortcut }),
+  theme: (theme: Theme) => invoke<void>('set_theme', { theme }),
+  export: () => invoke<number | null>('export_data'),
+  import: () => invoke<{ imported: number; skipped: number } | null>('import_data'),
+  openData: () => invoke<void>('open_data_directory'),
+  ready: () => invoke<void>('ready'),
+  finish: (action: 'hide' | 'quit') => invoke<void>('finish_window_action', { action }),
+  windowState: () => invoke<WindowState>('window_state'),
+  windowControl: (action: WindowControl) => invoke<WindowState>('window_control', { action }),
+  onWindowState: (handler: (state: WindowState) => void) => listen<WindowState>('window-state', event => handler(event.payload)),
+  onAction: (handler: (action: 'hide' | 'quit') => void) => listen<'hide' | 'quit'>('window-action', event => handler(event.payload)),
+  onFocus: (handler: () => void) => listen('capture-focus', handler),
+};
