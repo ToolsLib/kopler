@@ -84,8 +84,15 @@ jobs:
       - name: Verify the universal macOS app
         if: runner.os == 'macOS'
         run: |
-          lipo -verify_arch arm64 x86_64 src-tauri/target/universal-apple-darwin/release/kopler
-          codesign --verify --deep --strict src-tauri/target/universal-apple-darwin/release/bundle/macos/Kopler.app
+          mount_dir=$(mktemp -d "$RUNNER_TEMP/kopler-dmg.XXXXXX")
+          cleanup() {
+            hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+            rmdir "$mount_dir" || true
+          }
+          trap cleanup EXIT
+          hdiutil attach .release/${{ needs.validate.outputs.version }}/macos/Kopler_${{ needs.validate.outputs.version }}_macos_universal.dmg -readonly -nobrowse -mountpoint "$mount_dir"
+          lipo "$mount_dir/Kopler.app/Contents/MacOS/kopler" -verify_arch arm64 x86_64
+          codesign --verify --deep --strict "$mount_dir/Kopler.app"
       - name: Linux release launch and shortcut smoke check
         if: runner.os == 'Linux'
         env:
