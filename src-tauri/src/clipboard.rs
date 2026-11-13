@@ -41,7 +41,7 @@ fn dib_v5(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
     bytes[12..14].copy_from_slice(&1_u16.to_le_bytes());
     bytes[14..16].copy_from_slice(&32_u16.to_le_bytes());
     bytes.reserve(rgba.len());
-    for pixel in rgba.chunks_exact(4) {
+    for pixel in rgba.as_chunks::<4>().0 {
         bytes.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
     }
     bytes

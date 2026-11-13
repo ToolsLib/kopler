@@ -103,7 +103,7 @@ pub fn decode_rgba(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
     match info.color_type {
         png::ColorType::Rgba => unreachable!(),
         png::ColorType::Rgb => {
-            for pixel in pixels.chunks_exact(3) {
+            for pixel in pixels.as_chunks::<3>().0 {
                 rgba.extend_from_slice(&[pixel[0], pixel[1], pixel[2], 255]);
             }
         }
@@ -113,7 +113,7 @@ pub fn decode_rgba(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
             }
         }
         png::ColorType::GrayscaleAlpha => {
-            for pixel in pixels.chunks_exact(2) {
+            for pixel in pixels.as_chunks::<2>().0 {
                 rgba.extend_from_slice(&[pixel[0], pixel[0], pixel[0], pixel[1]]);
             }
         }
