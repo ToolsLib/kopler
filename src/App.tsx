@@ -391,8 +391,8 @@ export function App() {
 
     <section className="collection" aria-label="Saved items">
       <div className="collection-heading">
-        <SpaceTabs projects={projects} selectedId={projectId} busy={busy} onSelect={id => chooseView(id)} onManage={openProject} onRemove={requestDeleteProject} />
-        <div className="project-actions"><span className="count" aria-label={`${total} matching items`}>{total}</span>
+        <SpaceTabs projects={projects} selectedId={projectId} selectedCount={total} busy={busy} onSelect={id => chooseView(id)} onManage={openProject} onRemove={requestDeleteProject} />
+        <div className="project-actions">
           <button className="icon-button search-toggle" aria-label="Search and filters" aria-expanded={searchVisible} aria-controls="search-filters" data-active={!!search || filter !== 'all' || allProjects} title={`${searchVisible ? 'Hide' : 'Show'} search and filters${search || filter !== 'all' || allProjects ? ' · filters active' : ''}`} onClick={() => { focusSearch.current = !searchVisible; setSearchVisible(!searchVisible); }} disabled={busy}><Search size={15} /></button>
           <button className="icon-button" aria-label="New project" title="New project" onClick={() => openProject()} disabled={busy}><Plus size={16} /></button>
           {currentProject && <button className="icon-button" aria-label="Manage project" title="Manage project" onClick={() => openProject(currentProject)} disabled={busy}><MoreHorizontal size={17} /></button>}</div></div>

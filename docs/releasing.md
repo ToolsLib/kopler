@@ -1,6 +1,6 @@
 # Release builds
 
-The release version is currently **0.1.4**. The release tooling prepares native installers and checksums; it does not publish a public release automatically.
+The release version is currently **0.1.5**. The release tooling prepares native installers and checksums; it does not publish a public release automatically.
 
 | Platform | Runner | Download |
 | --- | --- | --- |
@@ -14,17 +14,17 @@ Windows ARM and Linux ARM packages are not included in this initial matrix. The 
 
 The repository is [ToolsLib/kopler](https://github.com/ToolsLib/kopler). Commit and push the workflow files with Actions enabled; the first branch push starts the desktop checks. Hosted results are available in [GitHub Actions](https://github.com/ToolsLib/kopler/actions).
 
-For downloadable test builds, open **Actions → Release builds → Run workflow** on the desired branch. This validates matching versions and release notes, runs unit/storage tests (plus Windows UI tests), builds all three native platforms, verifies both macOS architectures and the app signature, and runs an isolated Linux X11 release smoke check. Manual runs create a prerelease draft named `candidate-0.1.4-<run-id>` targeting the selected commit, with all four packages and combined checksums attached. Find those downloads in **Releases**; drafts require repository access and remain until published or deleted. Reruns refresh the same draft. Neither release builds nor routine desktop checks use Actions artifact storage.
+For downloadable test builds, open **Actions → Release builds → Run workflow** on the desired branch. This validates matching versions and release notes, runs unit/storage tests (plus Windows UI tests), builds all three native platforms, verifies both macOS architectures and the app signature, and runs an isolated Linux X11 release smoke check. Manual runs create a prerelease draft named `candidate-0.1.5-<run-id>` targeting the selected commit, with all four packages and combined checksums attached. Find those downloads in **Releases**; drafts require repository access and remain until published or deleted. Reruns refresh the same draft. Neither release builds nor routine desktop checks use Actions artifact storage.
 
 To create a draft GitHub Release, tag the reviewed commit after updating all versions and release notes:
 
 ```sh
 npm run release:check
-git tag v0.1.4
-git push origin v0.1.4
+git tag v0.1.5
+git push origin v0.1.5
 ```
 
-The workflow rejects a tag that differs from the app version. Tagged runs prepare a **draft** release using `docs/releases/v0.1.4.md`, and each platform uploads its packages directly to that draft after its checks pass. After every platform succeeds, assembly requires four manual packages, the macOS updater archive, and three signatures. It cryptographically verifies every updater package and its signed version against the app's public key, generates `latest.json` and `SHA256SUMS.txt`, and finalizes the ten-asset draft. Manual candidates use the same Release storage route with their own candidate draft. Failed builds can leave an incomplete draft, which must not be published. Every upload refuses to modify a published release.
+The workflow rejects a tag that differs from the app version. Tagged runs prepare a **draft** release using `docs/releases/v0.1.5.md`, and each platform uploads its packages directly to that draft after its checks pass. After every platform succeeds, assembly requires four manual packages, the macOS updater archive, and three signatures. It cryptographically verifies every updater package and its signed version against the app's public key, generates `latest.json` and `SHA256SUMS.txt`, and finalizes the ten-asset draft. Manual candidates use the same Release storage route with their own candidate draft. Failed builds can leave an incomplete draft, which must not be published. Every upload refuses to modify a published release.
 
 Review the draft's artifacts, signing status, release notes, and native platform behavior before manually publishing it. macOS building happens on the hosted Mac runner; a Mac is not needed on the Windows development machine. Compiling is not a claim that native desktop behavior has been validated on that platform.
 
@@ -102,4 +102,4 @@ sha256sum --check SHA256SUMS.txt  # Linux
 shasum -a 256 --check SHA256SUMS.txt  # macOS
 ```
 
-On Windows, compare `(Get-FileHash .\Kopler_0.1.4_windows_x64-setup.exe -Algorithm SHA256).Hash` against its entry in `SHA256SUMS.txt`. Checksums detect file changes; they do not replace publisher signatures.
+On Windows, compare `(Get-FileHash .\Kopler_0.1.5_windows_x64-setup.exe -Algorithm SHA256).Hash` against its entry in `SHA256SUMS.txt`. Checksums detect file changes; they do not replace publisher signatures.

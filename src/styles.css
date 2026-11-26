@@ -93,7 +93,7 @@ kbd { font: inherit; font-size: 9px; padding: 1px 3px; border: 1px solid var(--b
 .project-menu-item[data-highlighted] { background: var(--muted-surface); }
 .project-menu-item[data-disabled] { opacity: .45; pointer-events: none; }
 .project-menu-danger { color: var(--danger); }
-.count { min-width: 19px; padding: 2px 5px; border-radius: 5px; background: var(--muted-surface); color: var(--muted); text-align: center; font-size: 10px; }
+.count { flex-shrink: 0; min-width: 19px; padding: 2px 5px; border-radius: 5px; background: var(--muted-surface); color: var(--muted); text-align: center; font-size: 10px; }
 .project-actions { display: flex; align-items: center; flex-shrink: 0; gap: 2px; padding-bottom: 3px; }
 .search-controls { flex-shrink: 0; }
 .search-toggle { position: relative; }

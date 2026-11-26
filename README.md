@@ -19,7 +19,7 @@ Create a release executable and an unsigned installer:
 npm run release:windows
 ```
 
-The installer and checksum are staged in `.release/0.1.4/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
+The installer and checksum are staged in `.release/0.1.5/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
 
 `npm run dev` alone opens the interface in a browser, which deliberately has no access to desktop data. Use the Tauri command for the working application.
 

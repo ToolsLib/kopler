@@ -303,8 +303,11 @@ test('inbox tabs support keyboard switching and overflow while preserving the dr
   await expect.poll(() => page.getByRole('tablist', { name: 'Inboxes' }).evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
   await page.getByLabel('Capture text').press('Control+Enter');
   await expect(page.locator('.item-body')).toHaveText('Keep this draft across tabs');
+  await expect(page.getByRole('tab', { name: 'Ideas and research', exact: true }).locator('.count')).toHaveText('1');
+  await expect(page.locator('.project-actions .count')).toHaveCount(0);
   await page.getByRole('tab', { name: 'Inbox', exact: true }).click();
   await expect(page.locator('.item')).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Inbox', exact: true }).locator('.count')).toHaveText('0');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
