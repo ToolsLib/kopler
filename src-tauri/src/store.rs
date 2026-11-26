@@ -414,6 +414,14 @@ impl Store {
     pub fn preferences(&self) -> Result<Preferences> {
         self.get_setting("preferences")
     }
+    pub fn auto_update_check(&self) -> Result<bool> {
+        Ok(self
+            .get_setting::<Option<bool>>("auto_update_check")?
+            .unwrap_or(true))
+    }
+    pub fn save_auto_update_check(&self, enabled: bool) -> Result<()> {
+        self.put_setting("auto_update_check", &enabled)
+    }
     pub fn save_preferences(&self, value: &Preferences) -> Result<()> {
         if !["active", "completed", "all"].contains(&value.filter.as_str()) {
             return Err("Invalid item filter.".into());
@@ -969,6 +977,24 @@ mod tests {
         assert_eq!(db.item(&item.id).unwrap().body, body);
         assert_eq!(db.bootstrap().unwrap().draft.body, "unfinished");
         assert_eq!(db.bootstrap().unwrap().preferences.filter, "all");
+    }
+    #[test]
+    fn updater_preferences_default_for_legacy_data_and_survive_restart() {
+        let (dir, mut db) = setup();
+        assert!(db.auto_update_check().unwrap());
+        db.put_setting(
+            "preferences",
+            &serde_json::json!({"shortcut":"Ctrl+Alt+K","projectId":null,"filter":"all"}),
+        )
+        .unwrap();
+        assert!(db.auto_update_check().unwrap());
+        db.save_auto_update_check(false).unwrap();
+        drop(db);
+        db = Store::open(dir.path()).unwrap();
+        assert!(!db.auto_update_check().unwrap());
+        assert_eq!(db.preferences().unwrap().shortcut, "Ctrl+Alt+K");
+        let original: serde_json::Value = db.get_setting("preferences").unwrap();
+        assert_eq!(original.as_object().unwrap().len(), 3);
     }
     #[test]
     fn appearance_defaults_for_existing_preferences_and_survives_restart() {

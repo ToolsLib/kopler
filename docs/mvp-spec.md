@@ -175,7 +175,7 @@ Use a release build on a documented Windows 11 machine with at least four logica
 
 Collect corresponding macOS and Linux results before their release. Their memory metrics must be named explicitly and should not be treated as directly equivalent to Windows private working set. The first measured builds establish platform-specific budgets for review.
 
-No intentional network requests, clipboard polling, or periodic database refreshes while idle. Opening or using the MVP requires no network connection.
+No clipboard polling or periodic database refreshes while idle. Opening and using notes requires no network connection. Starting in 0.1.2, enabled update checks contact public GitHub Releases after startup and every six hours; users can disable them. Update downloads run only after the user chooses installation.
 
 ## Privacy and application boundaries
 
@@ -210,7 +210,7 @@ Build installers on the appropriate operating systems through CI; Windows-first 
 - AI generation, model integrations, browser extensions, and IDE integrations.
 - Cloud synchronization, accounts, collaboration, and mobile applications.
 - Tags, nested folders, pinning, manual ordering, recurring tasks, reminders, and due dates.
-- Double-Shift activation, launch at login, plugin systems, and automatic updates.
+- Double-Shift activation, launch at login, and plugin systems.
 - Encryption at rest, secure deletion, and password-manager features.
 
 ## Implementation milestones
@@ -233,7 +233,7 @@ Build installers on the appropriate operating systems through CI; Windows-first 
 - [ ] Round-trip all supported content through export/import. Reject malformed or conflicting imports without partial changes or data loss.
 - [ ] Recover safely from a failed migration with the original database preserved.
 - [ ] Handle shortcut conflicts, repeated launches, missing tray support, display changes, and display scaling.
-- [ ] Complete the workflow offline with no intentional network requests.
+- [ ] Complete the notes workflow offline; with automatic update checks disabled, make no intentional network requests.
 - [ ] Meet the Windows performance budgets and record reviewed budgets/results for macOS and Linux.
 - [ ] Pass the platform validation matrix, including the documented Wayland invocation path.
 - [ ] Set the public name and application identifier before publishing installers.

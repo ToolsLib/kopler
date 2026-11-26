@@ -6,4 +6,7 @@ pub mod store;
 mod desktop;
 
 #[cfg(feature = "desktop")]
+mod updates;
+
+#[cfg(feature = "desktop")]
 pub use desktop::run;

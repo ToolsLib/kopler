@@ -428,5 +428,5 @@ test('a failed appearance save keeps the applied mode and permits retry', async 
 test('export feedback remains accessible while settings is open', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
-  await expect(page.getByRole('dialog').getByRole('status')).toContainText('Exported 0 items');
+  await expect(page.getByRole('dialog').getByRole('status').filter({hasText:'Exported 0 items'})).toBeVisible();
 });

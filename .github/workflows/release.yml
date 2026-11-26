@@ -106,6 +106,9 @@ jobs:
         if: runner.os == 'Windows'
         run: npm run test:e2e
       - name: Build and stage native installers
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run release:${{ matrix.platform }}
       - name: Verify the universal macOS app
         if: runner.os == 'macOS'
@@ -157,6 +160,8 @@ jobs:
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true || { echo 'Refusing to modify a published release.' >&2; exit 1; }
           gh release download "$RELEASE_TAG" --pattern 'Kopler_*' --dir .release/combined
       - name: Require every platform and write combined checksums
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
         run: node scripts/release.mjs verify-assets .release/combined
       - name: Upload combined checksums to the draft release
         env:
@@ -165,7 +170,7 @@ jobs:
           RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
         run: |
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true || { echo 'Refusing to modify a published release.' >&2; exit 1; }
-          gh release upload "$RELEASE_TAG" .release/combined/SHA256SUMS.txt --clobber
+          gh release upload "$RELEASE_TAG" .release/combined/SHA256SUMS.txt .release/combined/latest.json --clobber
 
   draft-release:
     needs: [validate, assemble]
@@ -187,7 +192,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: |
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true || { echo 'Refusing to modify a published release.' >&2; exit 1; }
-          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')" = 5 || { echo 'Expected four packages and combined checksums.' >&2; exit 1; }
+          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')" = 10 || { echo 'Expected installers, signed updater packages, latest.json, and checksums.' >&2; exit 1; }
           title="Kopler $RELEASE_VERSION"
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then title="$title candidate"; fi
           gh release edit "$RELEASE_TAG" --draft --title "$title" --notes-file "docs/releases/v$RELEASE_VERSION.md"

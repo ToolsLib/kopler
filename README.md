@@ -19,7 +19,7 @@ Create a release executable and an unsigned installer:
 npm run release:windows
 ```
 
-The installer and checksum are staged in `.release/0.1.1/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
+The installer and checksum are staged in `.release/0.1.2/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
 
 `npm run dev` alone opens the interface in a browser, which deliberately has no access to desktop data. Use the Tauri command for the working application.
 
@@ -38,7 +38,8 @@ The installer and checksum are staged in `.release/0.1.1/windows/`; the original
 - Use an item's pencil icon to edit; it becomes a checkmark to save changes and close the editor. Item text stays selectable without opening editing. Editing autosaves; the checkmark, hiding, and quitting wait for pending writes. Failed saves keep the editor and text available for retry.
 - The Delete icon is always visible on each item. Confirm deletion in the dialog; Cancel and Escape keep the item. Confirmed deletion still offers Undo for 10 seconds.
 - Close or Escape hides the window. Use the tray menu or **Settings → Quit Kopler** to exit.
-- The Settings button at the bottom right provides JSON export/import and access to the local data directory. No account, network service, clipboard history, or AI connection is used.
+- The Settings button at the bottom right provides JSON export/import, access to the local data directory, and update checks. Notes stay local; no account, sync, clipboard history, or AI connection is used.
+- Starting with 0.1.2, Kopler checks public GitHub Releases on startup and every six hours, without taking capture focus. Settings lets you disable automatic checks, check manually, and install a verified update with **Install and restart**. Drafts and edits are saved before installation; failed saves or signature checks prevent it. Windows/macOS installations and Linux AppImages support in-app updates; DEB installations use the package download. Install 0.1.2 manually once when upgrading from an older version.
 
 Items are limited to 256 KiB of UTF-8 text and eight images (each at most 8 MiB as PNG and 16 megapixels). Pasted JPEG, WebP, BMP, and GIF files are normalized to still PNG images. Project names are limited to 80 characters and import files to 64 MiB/100,000 records, including image records. Saved text renders as Markdown (headings, lists, fenced code, tables, and links); editing and copying retain the exact original source. HTML is escaped, remote Markdown images are not loaded, and only HTTP/HTTPS links open externally. Storage and exports are not encrypted. Deleted items have a 10-second Undo window during the current session.
 

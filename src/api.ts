@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { Bootstrap, ClipboardContent, Draft, Filter, ImageRef, Item, ItemInput, Page, Project, Query, Theme, WindowControl, WindowState } from './types';
+import type { AvailableUpdate, Bootstrap, ClipboardContent, Draft, Filter, ImageRef, Item, ItemInput, Page, Project, Query, Theme, UpdateProgress, WindowControl, WindowState } from './types';
 
 export const desktop = isTauri();
 export const api = {
@@ -29,6 +29,10 @@ export const api = {
   copyText: (id: string) => invoke<void>('copy_item_text', { id }),
   shortcut: (shortcut: string) => invoke<void>('set_shortcut', { shortcut }),
   theme: (theme: Theme) => invoke<void>('set_theme', { theme }),
+  autoUpdateCheck: (enabled: boolean) => invoke<void>('set_auto_update_check', { enabled }),
+  checkUpdate: () => invoke<AvailableUpdate | null>('check_update'),
+  installUpdate: () => invoke<void>('install_update'),
+  onUpdateProgress: (handler: (progress: UpdateProgress) => void) => listen<UpdateProgress>('update-progress', event => handler(event.payload)),
   export: () => invoke<number | null>('export_data'),
   import: () => invoke<{ imported: number; skipped: number } | null>('import_data'),
   openData: () => invoke<void>('open_data_directory'),

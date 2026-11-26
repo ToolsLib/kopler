@@ -41,6 +41,21 @@ export async function desktopMock(page: Page) {
         }
         if (command === 'close_image_viewer') { window.close(); return; }
         if (command === 'open_external_url') { w.testNative.openedUrl = args.url; return; }
+        if (command === 'check_update') {
+          w.testNative.updateChecks = (w.testNative.updateChecks ?? 0) + 1;
+          if (w.testNative.failUpdateCheck) throw 'Network unavailable';
+          return w.testNative.availableUpdate ?? JSON.parse(localStorage.getItem('test-available-update') ?? 'null');
+        }
+        if (command === 'install_update') {
+          w.testNative.installRequests = (w.testNative.installRequests ?? 0) + 1;
+          w.testNative.draftAtInstall = structuredClone(state.draft);
+          w.testNative.itemsAtInstall = structuredClone(state.items);
+          w.testNative.emit('update-progress',{stage:'downloading',downloaded:25,total:100});
+          await new Promise(resolve => setTimeout(resolve, 30));
+          if (w.testNative.failUpdateInstall) throw 'Update signature verification failed. Your data was not changed.';
+          w.testNative.emit('update-progress',{stage:'installing',downloaded:0,total:null});
+          w.testNative.finished = 'update'; return;
+        }
         if (command === 'window_state') return w.testNative.window;
         if (command === 'window_control') {
           w.testNative.windowActions.push(args.action);
@@ -52,14 +67,14 @@ export async function desktopMock(page: Page) {
         if (command === 'bootstrap') {
           const error=localStorage.getItem('test-bootstrap-error');
           if(error) throw error;
-          return { data: state, shortcutError: null, wayland: false, trayAvailable: true, dataPath: 'isolated-test-data' };
+          return { data: state, shortcutError: null, wayland: false, trayAvailable: true, dataPath: 'isolated-test-data', appVersion: '0.1.2', autoUpdateCheck: state.autoUpdateCheck ?? true, canInstallUpdates: w.testNative.canInstallUpdates !== false && localStorage.getItem('test-no-self-install') !== 'true' };
         }
         if (command === 'list_items') {
           const q = args.query;
           const filtered = state.items.filter((item: RecordValue) => (q.allProjects || item.projectId === q.projectId) && (q.filter === 'all' || (q.filter === 'completed' ? !!item.completedAt : !item.completedAt)) && item.body.toLowerCase().includes(q.search.toLowerCase())).sort((a: RecordValue, b: RecordValue) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
           return { items: filtered.slice(q.offset, q.offset + 60), total: filtered.length };
         }
-        if (w.testNative.failSave && ['save_draft', 'update_item', 'create_item', 'delete_item', 'delete_project', 'save_view', 'set_theme', 'import_images'].includes(command)) throw 'Storage is full. Your text is retained.';
+        if (w.testNative.failSave && ['save_draft', 'update_item', 'create_item', 'delete_item', 'delete_project', 'save_view', 'set_theme', 'set_auto_update_check', 'import_images'].includes(command)) throw 'Storage is full. Your text is retained.';
         let result: unknown;
         if (command === 'save_draft') state.draft = args.draft;
         else if (command === 'save_view') Object.assign(state.preferences, { projectId: args.projectId, filter: args.filter });
@@ -107,6 +122,7 @@ export async function desktopMock(page: Page) {
         } else if (command === 'finish_window_action') w.testNative.finished = args.action;
         else if (command === 'set_shortcut') state.preferences.shortcut = args.shortcut;
         else if (command === 'set_theme') state.preferences.theme = args.theme;
+        else if (command === 'set_auto_update_check') state.autoUpdateCheck = args.enabled;
         else if (command === 'export_data') return state.items.length;
         else if (command === 'import_data') return null;
         else if (command !== 'open_data_directory') throw `Unknown native command: ${command}`;

@@ -55,6 +55,9 @@ struct InitialState {
     wayland: bool,
     tray_available: bool,
     data_path: String,
+    app_version: String,
+    can_install_updates: bool,
+    auto_update_check: bool,
 }
 
 fn wayland() -> bool {
@@ -165,7 +168,10 @@ async fn open_external_url(app: AppHandle, url: String) -> store::Result<()> {
 
 #[tauri::command]
 async fn bootstrap(app: AppHandle) -> store::Result<InitialState> {
-    let data = database(app.clone(), |db| db.bootstrap()).await?;
+    let (data, auto_update_check) = database(app.clone(), |db| {
+        Ok((db.bootstrap()?, db.auto_update_check()?))
+    })
+    .await?;
     let state = app.state::<AppState>();
     let shortcut_error = state
         .shortcut_error
@@ -178,6 +184,9 @@ async fn bootstrap(app: AppHandle) -> store::Result<InitialState> {
         wayland: wayland(),
         tray_available: state.tray_available.load(Ordering::Relaxed),
         data_path: state.directory.display().to_string(),
+        app_version: app.package_info().version.to_string(),
+        can_install_updates: crate::updates::can_install(),
+        auto_update_check,
     })
 }
 #[tauri::command]
@@ -380,6 +389,11 @@ async fn set_theme(app: AppHandle, theme: store::ThemePreference) -> store::Resu
     app.set_theme(native_theme(theme));
     let _ = app.emit("appearance-changed", theme);
     Ok(())
+}
+
+#[tauri::command]
+async fn set_auto_update_check(app: AppHandle, enabled: bool) -> store::Result<()> {
+    database(app, move |db| db.save_auto_update_check(enabled)).await
 }
 
 #[tauri::command]
@@ -733,6 +747,8 @@ fn finish_window_action(app: AppHandle, action: String) -> store::Result<()> {
 
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        .manage(crate::updates::UpdateState::default())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             if args.iter().any(|arg| arg == "--toggle") {
                 toggle_main(app);
@@ -815,7 +831,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![image_viewer_info,open_image_viewer,close_image_viewer,open_external_url,bootstrap,list_items,create_item,update_item,complete_item,delete_item,undo_delete,create_project,rename_project,delete_project,save_draft,save_view,read_clipboard,import_images,read_image,copy_image,copy_item,copy_item_text,set_shortcut,set_theme,export_data,import_data,open_data_directory,ready,window_state,window_control,finish_window_action])
+        .invoke_handler(tauri::generate_handler![crate::updates::check_update,crate::updates::install_update,set_auto_update_check,image_viewer_info,open_image_viewer,close_image_viewer,open_external_url,bootstrap,list_items,create_item,update_item,complete_item,delete_item,undo_delete,create_project,rename_project,delete_project,save_draft,save_view,read_clipboard,import_images,read_image,copy_image,copy_item,copy_item_text,set_shortcut,set_theme,export_data,import_data,open_data_directory,ready,window_state,window_control,finish_window_action])
         .build(tauri::generate_context!())
         .expect("Could not initialize the desktop application");
     application.run(|app, event| {

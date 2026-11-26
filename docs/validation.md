@@ -1,5 +1,13 @@
 # MVP validation
 
+## Signed updates — 26 November 2026
+
+Version 0.1.2 introduces automatic GitHub Release checks, a persisted opt-out, manual checks, available-update notification, progress, and explicit installation/restart. Installation flushes pending writes first and leaves edits/drafts available after save or download failures. Linux package-managed builds offer a release download instead of self-installation. The opt-out is stored in its own settings record, preserving the existing preferences JSON for older installations.
+
+All 37 production interface tests, 17 Rust tests, seven release-tool tests, and three pending-write tests passed locally. Rust formatting, Clippy, and actionlint passed. Signature verification was checked against a real version-bound Tauri CLI signature. A windowless native diagnostic also verified that fixture with Tauri's actual updater and rejected both corrupted package bytes and a mismatched signed version, without opening Kopler or its store. Windows examples explicitly embed Common Controls v6, matching the app's existing requirement. Release tests reject modified packages, changed signing keys, forged trusted comments, mismatched signed versions, missing signature files, and incomplete asset sets; they also verify the four-platform update manifest and checksums. The signing key is stored as encrypted repository secrets with an encrypted local backup; only its public key is embedded in the app.
+
+Older versions require one manual installation of 0.1.2. A full in-app replacement between two published updater-enabled versions, native macOS update interaction, and native Linux AppImage replacement remain pending. Hosted builds validate the cross-platform updater packages and signatures before publication. Update downloads and manifests continue to use Release storage, without Actions artifacts.
+
 ## Capture, image viewer, and Markdown follow-up — 26 November 2026
 
 Image paste keeps capture/edit textareas focused throughout processing and preserves selection and scroll position; mixed text/image paste restores the caret after the inserted text. Attachments open in a separate resizable image window, initially up to 1100 × 840, with fit, actual size, zoom, panning, native image copying, independent window controls, and live appearance updates. Saved notes render Markdown while editing and copying retain the original source. HTML is escaped, remote Markdown images are not fetched, and only HTTP/HTTPS links open externally. The selected tab no longer has a top accent line.

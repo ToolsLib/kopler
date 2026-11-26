@@ -5,6 +5,7 @@ import { Dialog } from './components/Dialog';
 import { SpaceTabs, spaceTabId } from './components/SpaceTabs';
 import { ImagePreview } from './components/ImagePreview';
 import { TitleBar } from './components/TitleBar';
+import { UpdateSettings, useUpdates } from './components/Updates';
 import { clipboardImage, imageFileType } from './paste';
 import { PendingWrites } from './writes';
 import type { Bootstrap, Draft, Filter, ImageRef, Item, ItemInput, Project, Query, Theme } from './types';
@@ -43,6 +44,8 @@ export function App() {
   const [activeShortcut, setActiveShortcut] = useState('');
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>('system');
+  const [autoUpdateCheck, setAutoUpdateCheck] = useState(true);
+  const updates = useUpdates(!!initial, autoUpdateCheck, busy);
   const [toast, setToast] = useState<{ text: string; undo?: string } | null>(null);
   const captureRef = useRef<HTMLTextAreaElement>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
@@ -109,6 +112,7 @@ export function App() {
       setProjectId(result.data.preferences.projectId); setFilter('all');
       setShortcut(result.data.preferences.shortcut); setActiveShortcut(result.data.preferences.shortcut); setShortcutError(result.shortcutError);
       setTheme(result.data.preferences.theme ?? 'system');
+      setAutoUpdateCheck(result.autoUpdateCheck);
     }).catch(error => { if (alive) setFatal(message(error)); })
       .finally(() => { void Promise.all([actionListener, focusListener]).then(() => api.ready()).catch(error => setFatal(message(error))); });
     return () => { alive = false; void actionListener.then(stop => stop()); void focusListener.then(stop => stop()); };
@@ -411,6 +415,7 @@ export function App() {
     <footer className="app-footer">
       <span className={`save-status ${saveStatus}`} aria-live="polite">{(busy || saveStatus !== 'saved') && <><span className="status-dot" />{busy || saveStatus === 'saving' ? 'Saving…' : saveStatus === 'pending' ? 'Unsaved changes' : 'Save failed · draft retained'}</>}</span>
       <div className="footer-actions">
+        {updates.available && <button className="text-button update-available" disabled={busy} onClick={openSettings}>Update available</button>}
         <button className="shortcut-hint" onClick={openSettings} disabled={busy} title="Configure shortcut"><Keyboard size={12} /><span>{shortcutError ? 'Set shortcut' : activeShortcut.replaceAll('+', ' + ')}</span></button>
         <button className="icon-button" aria-label="Settings" title="Settings" onClick={openSettings} disabled={busy}><Settings size={15} /></button>
       </div>
@@ -425,8 +430,11 @@ export function App() {
         <p className="field-help">{shortcutError ?? 'Open from anywhere. If a shortcut is in use, your previous binding stays active.'}</p>
       </form>
       <div className="settings-section"><h3>Keep a copy</h3><p className="field-help">Export notes and projects, or merge a previous export. Conflicting imports leave your data unchanged.</p><div className="button-row"><button disabled={busy} onClick={() => { void act(async () => { const count = await api.export(); if (count !== null) setToast({ text: `Exported ${count} items` }); }); }}><ArrowUpFromLine size={14} /> Export JSON</button><button disabled={busy} onClick={() => { void act(async () => { const result = await api.import(); if (result) { const state = await api.bootstrap(); setProjects(state.data.projects); await reload(); setToast({ text: `${result.imported} imported, ${result.skipped} already present` }); } }); }}><ArrowDownToLine size={14} /> Import JSON</button></div></div>
+      <UpdateSettings updates={updates} version={initial.appVersion} automatic={autoUpdateCheck} canInstall={initial.canInstallUpdates} busy={busy}
+        onAutomatic={enabled => { void act(async () => { await api.autoUpdateCheck(enabled); setAutoUpdateCheck(enabled); }); }}
+        onInstall={() => { void act(async () => { await updates.install(); }); }} onError={windowError} />
       <div className="settings-section"><h3>Local data</h3><p className="data-path">{initial.dataPath}</p><p className="field-help">Storage and exports are not encrypted. Keep confidential credentials in a password manager.</p><button disabled={busy} onClick={() => { void act(async () => { await api.openData(); }); }}><FolderOpen size={14} /> Open data folder</button></div>
-      {dialogError}<div className="dialog-footer"><span className="muted">Kopler 0.1.0 · local preview</span><button className="danger-text" disabled={busy} onClick={() => windowAction.current('quit')}>Quit Kopler</button></div>
+      {dialogError}<div className="dialog-footer"><span className="muted">Kopler {initial.appVersion}</span><button className="danger-text" disabled={busy} onClick={() => windowAction.current('quit')}>Quit Kopler</button></div>
     </Dialog>}
 
     {modal?.type === 'project' && <Dialog title={modal.project ? 'Manage project' : 'A new project'} description="A simple place to group notes and next steps." onClose={() => setModal(null)} busy={busy} notice={notification}>
