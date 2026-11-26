@@ -19,6 +19,45 @@ async function pasteImage(page: Page, target = 'Capture text', count = 1, type =
 
 test.beforeEach(async ({page})=>{await desktopMock(page);await page.goto('/');await expect(page.getByLabel('Capture text')).toBeVisible();});
 
+for (const button of ['Copy item', 'Copy text only', 'Copy image 1']) {
+  test(`${button} keeps the UI editable and copies without saving pending edits`, async ({page}) => {
+    const png = await pasteImage(page);
+    await page.getByLabel('Capture text').fill('Saved caption');
+    await page.getByRole('button', {name:'Save item',exact:true}).click();
+    await page.getByRole('button', {name:'Edit item',exact:true}).click();
+    await page.clock.install();
+    await page.clock.pauseAt(new Date(Date.now() + 10_000));
+    await page.getByLabel('Edit item text').fill('**Latest unsaved caption**');
+    await page.getByLabel('Capture text').fill('An unrelated unfinished draft');
+    await page.evaluate(() => {
+      const native = (window as any).testNative;
+      native.failSave = true;
+      native.copyGate = new Promise(resolve => { native.releaseCopy = resolve; });
+    });
+    await page.getByRole('button', {name:button,exact:true}).click();
+    await expect.poll(() => page.evaluate(() => (window as any).testNative.copyRequests)).toBe(1);
+    await expect(page.getByLabel('Capture text')).toBeEditable();
+    await expect(page.getByLabel('Edit item text')).toBeEditable();
+    await expect(page.getByRole('button', {name:'New project',exact:true})).toBeEnabled();
+    await expect(page.locator('.save-status')).toHaveText('Unsaved changes');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.evaluate(() => { (window as any).testNative.releaseCopy(); });
+    await expect(page.locator('.toast')).toContainText('copied');
+    await expect.poll(() => page.evaluate(() => (window as any).testNative.copied)).toBe(button === 'Copy image 1' ? '' : '**Latest unsaved caption**');
+    await expect.poll(() => page.evaluate(() => (window as any).testNative.copiedImage)).toBe(button === 'Copy text only' ? '' : png);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('test-native-state')!));
+    expect(saved.items[0].body).toBe('Saved caption');
+    expect(saved.draft.body).toBe('');
+    // A failed autosave must not block subsequent copies either.
+    await page.clock.fastForward(301);
+    await expect(page.locator('.save-status')).toContainText('Save failed');
+    await page.getByRole('button', {name:button,exact:true}).click();
+    await expect.poll(() => page.evaluate(() => (window as any).testNative.copyRequests)).toBe(2);
+    await expect(page.locator('.save-status')).toContainText('Save failed');
+    await expect(page.getByLabel('Edit item text')).toHaveValue('**Latest unsaved caption**');
+  });
+}
+
 test('image import keeps the capture textarea focused throughout processing', async ({page}) => {
   await page.getByLabel('Capture text').fill('Keep the caret here');
   await page.getByLabel('Capture text').evaluate(element => {
@@ -60,9 +99,15 @@ test('pasted images retain captions and survive draft recovery, space switching,
   await page.getByRole('button',{name:'Copy item',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copied)).toBe('A caption worth keeping');
   await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copiedImages.length)).toBe(2);
+  const secondImage=await page.evaluate(()=>(window as any).testNative.copiedImages[1]);
   await page.getByRole('button',{name:'Copy text only',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copiedImage)).toBe('');
   await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copied)).toBe('A caption worth keeping');
+  await page.getByRole('button',{name:'Copy image 2',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copiedImage)).toBe(secondImage);
+  await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copied)).toBe('');
+  await expect(page.getByRole('status')).toContainText('Image copied');
+  expect(page.context().pages()).toHaveLength(1);
   const opened = page.waitForEvent('popup');
   await page.getByRole('button',{name:'Open image 1',exact:true}).click();
   const viewer = await opened;

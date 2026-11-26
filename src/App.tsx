@@ -35,6 +35,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [draggingImages, setDraggingImages] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved');
@@ -66,6 +67,7 @@ export function App() {
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const projectDeleteCancelRef = useRef<HTMLButtonElement>(null);
   const actionLock = useRef(false);
+  const copyLock = useRef(false);
   const requestId = useRef(0);
   const queryRef = useRef<Query>({ projectId: null, filter: 'all', allProjects: false, search: '', offset: 0 });
   queryRef.current = { projectId, filter, allProjects, search, offset };
@@ -211,8 +213,19 @@ export function App() {
   function saveEdit() {
     void act(async () => { setEditing(null); await reload(); listRef.current?.focus(); });
   }
-  function copy(item: Item) {
-    void act(async () => { await api.copy(item.id); setToast({ text: item.images?.length && item.body.trim() ? 'Text and images copied' : 'Copied to clipboard' }); });
+  async function copyToClipboard(action: () => Promise<void>, success: string) {
+    if (actionLock.current || copyLock.current) return;
+    copyLock.current = true; setCopying(true);
+    try { await action(); setToast({ text: success }); }
+    catch (error) { setError(message(error)); }
+    finally { copyLock.current = false; setCopying(false); }
+  }
+  function copy(item: Item, textOnly = false) {
+    const current = editing?.id === item.id ? editing : item;
+    void copyToClipboard(
+      () => textOnly ? api.copyText(item.id, current.body) : api.copy(item.id, current),
+      textOnly ? 'Text copied' : current.images?.length && current.body.trim() ? 'Text and images copied' : 'Copied to clipboard',
+    );
   }
   function remove(item: Item) {
     void act(async () => {
@@ -285,6 +298,7 @@ export function App() {
     if (!images.length) return null;
     return <div className={`image-grid${remove ? ' image-grid-editable' : ''}`}>{images.map((image,index) => <div className="image-attachment" key={image.id}>
       <button className="image-open" type="button" aria-label={`Open image ${index + 1}`} onClick={event => { event.stopPropagation(); void act(async () => { await api.openImageViewer(image.id); }); }} disabled={busy}><ImagePreview image={image} /></button>
+      <button className="icon-button image-copy" type="button" aria-label={`Copy image ${index + 1}`} title="Copy image" onClick={event => { event.stopPropagation(); void copyToClipboard(() => api.copyImage(image.id), 'Image copied'); }} disabled={busy || copying}><Copy size={12} /></button>
       {remove && <button className="icon-button image-remove" type="button" aria-label={`Remove image ${index + 1}`} onClick={() => remove(image.id)} disabled={busy}><X size={12} /></button>}
     </div>)}</div>;
   }
@@ -395,8 +409,8 @@ export function App() {
         {items.map(item => <article id={`item-${item.id}`} key={item.id} className={`item ${selected === item.id ? 'selected' : ''} ${item.completedAt ? 'completed' : ''}`} onClick={() => setSelected(item.id)}>
           <div className="item-topline">{item.kind === 'task' ? <button className="task-check" aria-label={item.completedAt ? 'Reopen task' : 'Complete task'} aria-pressed={!!item.completedAt} disabled={busy} onClick={() => { void act(async () => { await api.complete(item.id, !item.completedAt); await reload(); }); }}>{item.completedAt && <Check size={12} />}</button> : <FileText className="note-symbol" size={15} />}
             <span className="item-meta">{allProjects ? projectLabel(item.projectId) : item.kind === 'task' ? 'Task' : 'Note'}<span>·</span><time dateTime={item.createdAt}>{labelDate(item.createdAt)}</time></span>
-            <div className="item-actions"><button className="icon-button" aria-label="Copy item" title={item.images?.length ? 'Copy text and images' : 'Copy'} disabled={busy} onClick={event => { event.stopPropagation(); copy(item); }}><Copy size={14} /></button>
-              {!!item.images?.length && !!item.body.trim() && <button className="icon-button" aria-label="Copy text only" title="Copy text only" disabled={busy} onClick={event => { event.stopPropagation(); void act(async () => { await api.copyText(item.id); setToast({ text: 'Text copied' }); }); }}><FileText size={14} /></button>}
+            <div className="item-actions"><button className="icon-button" aria-label="Copy item" title={item.images?.length ? 'Copy text and images' : 'Copy'} disabled={busy || copying} onClick={event => { event.stopPropagation(); copy(item); }}><Copy size={14} /></button>
+              {!!item.images?.length && !!item.body.trim() && <button className="icon-button" aria-label="Copy text only" title="Copy text only" disabled={busy || copying} onClick={event => { event.stopPropagation(); copy(item, true); }}><FileText size={14} /></button>}
               <button className="icon-button" aria-label={editing?.id === item.id ? 'Save item changes' : 'Edit item'} title={editing?.id === item.id ? 'Save changes' : 'Edit'} disabled={busy} onClick={event => { event.stopPropagation(); if (editing?.id === item.id) saveEdit(); else edit(item); }}>{editing?.id === item.id ? <Check size={14} /> : <Pencil size={14} />}</button>
               <button className="icon-button delete-button" aria-label="Delete item" title={`Delete (${mod}+click to skip confirmation)`} disabled={busy} onClick={event => { event.stopPropagation(); if (mac ? event.metaKey : event.ctrlKey) remove(item); else confirmRemove(item); }}><Trash2 size={14} /></button></div></div>
           {editing?.id === item.id ? <div className="item-editor">

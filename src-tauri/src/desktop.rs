@@ -326,10 +326,19 @@ async fn copy_image(app: AppHandle, id: String) -> store::Result<()> {
     .await
 }
 #[tauri::command]
-async fn copy_item(app: AppHandle, id: String) -> store::Result<()> {
+async fn copy_item(app: AppHandle, id: String, input: Option<ItemInput>) -> store::Result<()> {
     let clipboard = app.clone();
     database(app, move |db| {
-        let item = db.item(&id)?;
+        let mut item = db.item(&id)?;
+        if let Some(input) = input {
+            store::validate_body(&input.body)?;
+            if input.images.len() > images::MAX_IMAGES {
+                return Err("Keep at most 8 images in one item.".into());
+            }
+            // Copy the editor snapshot without requiring it to be persisted first.
+            item.body = input.body;
+            item.images = input.images;
+        }
         if item.images.is_empty() {
             return clipboard
                 .clipboard()
@@ -367,12 +376,14 @@ async fn copy_item(app: AppHandle, id: String) -> store::Result<()> {
 }
 
 #[tauri::command]
-async fn copy_item_text(app: AppHandle, id: String) -> store::Result<()> {
+async fn copy_item_text(app: AppHandle, id: String, body: Option<String>) -> store::Result<()> {
     let clipboard = app.clone();
     database(app, move |db| {
+        let text = body.unwrap_or(db.item(&id)?.body);
+        store::validate_body(&text)?;
         clipboard
             .clipboard()
-            .write_text(db.item(&id)?.body)
+            .write_text(text)
             .map_err(|_| "Could not copy text. Try again.".into())
     })
     .await

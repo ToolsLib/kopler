@@ -41,7 +41,7 @@ fn validate_time(value: &str) -> Result<()> {
     }
     Ok(())
 }
-fn validate_body(body: &str) -> Result<()> {
+pub(crate) fn validate_body(body: &str) -> Result<()> {
     if body.len() > MAX_BODY {
         return Err("An item can contain at most 256 KiB of text.".into());
     }

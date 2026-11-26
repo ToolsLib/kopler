@@ -74,6 +74,11 @@ export async function desktopMock(page: Page) {
           const filtered = state.items.filter((item: RecordValue) => (q.allProjects || item.projectId === q.projectId) && (q.filter === 'all' || (q.filter === 'completed' ? !!item.completedAt : !item.completedAt)) && item.body.toLowerCase().includes(q.search.toLowerCase())).sort((a: RecordValue, b: RecordValue) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
           return { items: filtered.slice(q.offset, q.offset + 60), total: filtered.length };
         }
+        if (['copy_item', 'copy_item_text', 'copy_image'].includes(command)) {
+          w.testNative.copyRequests = (w.testNative.copyRequests ?? 0) + 1;
+          if (w.testNative.copyGate) await w.testNative.copyGate;
+          if (w.testNative.failCopy) throw 'Could not copy. Try again.';
+        }
         if (w.testNative.failSave && ['save_draft', 'update_item', 'create_item', 'delete_item', 'delete_project', 'save_view', 'set_theme', 'set_auto_update_check', 'import_images'].includes(command)) throw 'Storage is full. Your text is retained.';
         let result: unknown;
         if (command === 'save_draft') state.draft = args.draft;
@@ -88,12 +93,12 @@ export async function desktopMock(page: Page) {
           const item = state.items.find((item: RecordValue) => item.id === args.id);
           item.completedAt = args.completed ? timestamp() : null; result = item;
         } else if (command === 'copy_item') {
-          const item = state.items.find((item: RecordValue) => item.id === args.id);
+          const item = args.input ?? state.items.find((item: RecordValue) => item.id === args.id);
           w.testNative.copied = item.body;
           w.testNative.copiedImages = (item.images ?? []).map((image: RecordValue) => state.images[image.id]);
           w.testNative.copiedImage = w.testNative.copiedImages[0] ?? '';
         }
-        else if (command === 'copy_item_text') { w.testNative.copied=state.items.find((item: RecordValue)=>item.id===args.id).body; w.testNative.copiedImage='';w.testNative.copiedImages=[]; }
+        else if (command === 'copy_item_text') { w.testNative.copied=args.body ?? state.items.find((item: RecordValue)=>item.id===args.id).body; w.testNative.copiedImage='';w.testNative.copiedImages=[]; }
         else if (command === 'read_clipboard' || command === 'import_images') {
           if (command === 'import_images' && w.testNative.importDelay) await new Promise(resolve => setTimeout(resolve, w.testNative.importDelay));
           const dataUrls = command === 'import_images' ? args.dataUrls : w.testNative.clipboardImage ? [w.testNative.clipboardImage] : [];
@@ -106,7 +111,7 @@ export async function desktopMock(page: Page) {
           result = command === 'import_images' ? images : images.length ? {type:'image',image:images[0],text:w.testNative.clipboardImageText || null} : {type:'text',text:w.testNative.clipboard};
         }
         else if (command === 'read_image') return state.images[args.id];
-        else if (command === 'copy_image') w.testNative.copiedImage = state.images[args.id];
+        else if (command === 'copy_image') { w.testNative.copiedImage = state.images[args.id]; w.testNative.copied = ''; w.testNative.copiedImages = [w.testNative.copiedImage]; }
         else if (command === 'delete_item') {
           const item = state.items.find((item: RecordValue) => item.id === args.id);
           const token = crypto.randomUUID(); undo[token] = item;

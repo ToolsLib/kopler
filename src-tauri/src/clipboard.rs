@@ -53,17 +53,14 @@ pub fn write_mixed(text: &str, images: &[Vec<u8>]) -> Result<(), String> {
     let first = images.first().ok_or("No image to copy.")?;
     let (width, height, rgba) = images::decode_rgba(first)?;
     let bitmap = dib_v5(width, height, &rgba);
-    let html = content_html(text, images);
     let png_format = raw::register_format("PNG")
         .ok_or("Could not register the image clipboard format.")?
-        .get();
-    let html_format = raw::register_format("HTML Format")
-        .ok_or("Could not register the rich clipboard format.")?
         .get();
     let result = (|| {
         let _clipboard = Clipboard::new_attempts(10)?;
         raw::empty()?;
-        raw::set_html(html_format, &html)?;
+        // Keep rich HTML off this clipboard: some chat inputs turn embedded
+        // images into their alt text instead of attaching the native image.
         raw::set_without_clear(png_format, first)?;
         raw::set_without_clear(clipboard_win::formats::CF_DIBV5, &bitmap)?;
         raw::set_string_with(text, NoClear)
