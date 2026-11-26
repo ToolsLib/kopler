@@ -45,11 +45,3 @@ jobs:
         run: npm run test:e2e
       - name: Build desktop executable
         run: npm run tauri -- build --no-bundle
-      - uses: actions/upload-artifact@v7
-        with:
-          name: desktop-${{ runner.os }}
-          if-no-files-found: error
-          retention-days: 14
-          path: |
-            src-tauri/target/release/kopler.exe
-            src-tauri/target/release/kopler

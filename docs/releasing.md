@@ -14,7 +14,7 @@ Windows ARM and Linux ARM packages are not included in this initial matrix. The 
 
 The repository is [ToolsLib/kopler](https://github.com/ToolsLib/kopler). Commit and push the workflow files with Actions enabled; the first branch push starts the desktop checks. Hosted results are available in [GitHub Actions](https://github.com/ToolsLib/kopler/actions).
 
-For downloadable test builds, open **Actions → Release builds → Run workflow** on the desired branch. This validates matching versions and release notes, runs unit/storage tests (plus Windows UI tests), builds all three native platforms, verifies both macOS architectures and the app signature, and runs an isolated Linux X11 release smoke check. It uploads per-platform artifacts and a combined `release-candidate-0.1.1` artifact. Artifacts are retained for 30 days. Downloading these artifacts requires repository access; they are not public downloads.
+For downloadable test builds, open **Actions → Release builds → Run workflow** on the desired branch. This validates matching versions and release notes, runs unit/storage tests (plus Windows UI tests), builds all three native platforms, verifies both macOS architectures and the app signature, and runs an isolated Linux X11 release smoke check. Manual runs create a prerelease draft named `candidate-0.1.1-<run-id>` targeting the selected commit, with all four packages and combined checksums attached. Find those downloads in **Releases**; drafts require repository access and remain until published or deleted. Reruns refresh the same draft. Neither release builds nor routine desktop checks use Actions artifact storage.
 
 To create a draft GitHub Release, tag the reviewed commit after updating all versions and release notes:
 
@@ -24,7 +24,7 @@ git tag v0.1.1
 git push origin v0.1.1
 ```
 
-The workflow rejects a tag that differs from the app version. After every platform succeeds, it collects exactly four installers and writes a combined `SHA256SUMS.txt`, then creates a **draft** release using `docs/releases/v0.1.1.md`. Rerunning can refresh an existing draft; it refuses to modify an already published release. A manual run always produces artifacts only, including when run against a tag.
+The workflow rejects a tag that differs from the app version. Tagged runs prepare a **draft** release using `docs/releases/v0.1.1.md`, and each platform uploads its packages directly to that draft after its checks pass. After every platform succeeds, the workflow downloads exactly four installers, validates their names, generates a combined `SHA256SUMS.txt`, and finalizes the draft. Manual candidates use the same Release storage route with their own candidate draft. Failed builds can leave an incomplete draft, which must not be published. Every upload refuses to modify a published release.
 
 Review the draft's artifacts, signing status, release notes, and native platform behavior before manually publishing it. macOS building happens on the hosted Mac runner; a Mac is not needed on the Windows development machine. Compiling is not a claim that native desktop behavior has been validated on that platform.
 

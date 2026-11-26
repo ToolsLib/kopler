@@ -10,6 +10,8 @@ An isolated Windows desktop check confirmed real clipboard image paste with no b
 
 The updated Windows installer is 2,248,789 bytes; SHA-256: `e1c1cf61eeee1717340f58aaf8476282c223f1d86b8857ff5a82934d35cc0f38`. This local build has not been published as a new GitHub release.
 
+The v0.1.1 release preparation initially reached a GitHub Actions artifact storage quota error after the macOS executable had compiled successfully. Tagged builds now upload packages directly to a guarded draft Release, and assembly downloads those packages to validate the complete set and generate combined checksums. Manual runs use separate prerelease drafts for their candidates. Routine desktop checks no longer upload duplicate binaries. Neither workflow uses Actions artifact storage. Existing artifacts and v0.1.0 release downloads were preserved.
+
 ## Initial MVP validation — 13 November 2026
 
 Validated on 13 November 2026. Windows is the first MVP delivery target. macOS validation is deferred at the user's request. Linux has a successful native build and X11 smoke test; Wayland desktop behavior remains a separate validation item.
