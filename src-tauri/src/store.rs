@@ -737,6 +737,20 @@ impl Store {
         tx.commit().map_err(db_error)?;
         Ok(references)
     }
+    pub fn image_reference(&self, id: &str) -> Result<ImageRef> {
+        validate_id(id)?;
+        self.conn
+            .query_row("SELECT width,height FROM images WHERE id=?1", [id], |row| {
+                Ok(ImageRef {
+                    id: id.to_string(),
+                    width: row.get(0)?,
+                    height: row.get(1)?,
+                })
+            })
+            .optional()
+            .map_err(db_error)?
+            .ok_or("Image not found.".into())
+    }
     pub fn image_bytes(&self, id: &str, thumbnail: bool) -> Result<Vec<u8>> {
         validate_id(id)?;
         self.conn
@@ -1099,6 +1113,9 @@ mod tests {
         let (dir, mut db) = setup();
         let png = images::encode_rgba(2, 2, &[30, 60, 90, 120].repeat(4)).unwrap();
         let image = db.put_image(images::prepare(png.clone()).unwrap()).unwrap();
+        assert_eq!(db.image_reference(&image.id).unwrap(), image);
+        assert!(db.image_reference("invalid-id").is_err());
+        assert!(db.image_reference(&Uuid::new_v4().to_string()).is_err());
         let draft = Draft {
             body: "caption".into(),
             images: vec![image.clone()],

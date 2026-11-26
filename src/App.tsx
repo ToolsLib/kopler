@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, Check, CheckCheck, ChevronLeft, ChevronRight, Clipboard, Copy, FileText, FolderOpen, Inbox, Keyboard, LoaderCircle, MoreHorizontal, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react';
 import { api, desktop } from './api';
 import { Dialog } from './components/Dialog';
@@ -9,7 +9,8 @@ import { clipboardImage, imageFileType } from './paste';
 import { PendingWrites } from './writes';
 import type { Bootstrap, Draft, Filter, ImageRef, Item, ItemInput, Project, Query, Theme } from './types';
 
-type Modal = { type: 'settings' } | { type: 'project'; project?: Project } | { type: 'delete-project'; project: Project } | { type: 'delete-item'; item: Item } | { type: 'clipboard'; text: string } | { type: 'image'; image: ImageRef };
+type Modal = { type: 'settings' } | { type: 'project'; project?: Project } | { type: 'delete-project'; project: Project } | { type: 'delete-item'; item: Item } | { type: 'clipboard'; text: string };
+const MarkdownBody = lazy(() => import('./components/MarkdownBody').then(module => ({ default: module.MarkdownBody })));
 const blank: Draft = { body: '', kind: 'note', projectId: null, images: [] };
 const mac = /Mac/.test(navigator.platform);
 const mod = mac ? '⌘' : 'Ctrl';
@@ -46,6 +47,16 @@ export function App() {
   const captureRef = useRef<HTMLTextAreaElement>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
   const focusEdit = useRef(false);
+  const pasteFocus = useRef<{ element: HTMLTextAreaElement; start: number; end: number; scroll: number } | null>(null);
+  useEffect(() => {
+    const pending = pasteFocus.current;
+    if (busy || !pending) return;
+    pasteFocus.current = null;
+    if (!pending.element.isConnected) return;
+    pending.element.focus({ preventScroll: true });
+    pending.element.setSelectionRange(pending.start, pending.end);
+    pending.element.scrollTop = pending.scroll;
+  }, [busy]);
   const searchRef = useRef<HTMLInputElement>(null);
   const focusSearch = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -220,19 +231,29 @@ export function App() {
       }
       else if (draft.body.trim()) setModal({ type: 'clipboard', text: content.text });
       else changeDraft({ ...draft, body: content.text });
-      captureRef.current?.focus();
+      if (captureRef.current && content.type === 'image') pasteFocus.current = { element: captureRef.current, start: captureRef.current.value.length, end: captureRef.current.value.length, scroll: captureRef.current.scrollTop };
     });
   }
   function pasteImages(event: ClipboardEvent<HTMLTextAreaElement>, target: Draft | (ItemInput & { id: string })) {
     const files = Array.from(event.clipboardData.files).filter(file => file.type.startsWith('image/'));
-    if (!files.length) return;
+    const markdown = event.clipboardData.getData('text/markdown') || event.clipboardData.getData('text/x-markdown');
+    if (!files.length && !markdown) return;
     event.preventDefault();
-    const text = event.clipboardData.getData('text/plain');
-    const { selectionStart, selectionEnd } = event.currentTarget;
+    const text = markdown || event.clipboardData.getData('text/plain');
+    const element = event.currentTarget;
+    const { selectionStart, selectionEnd } = element;
     const body = text ? target.body.slice(0, selectionStart) + text + target.body.slice(selectionEnd) : target.body;
-    addImageFiles(files, target, body);
+    if (!files.length) {
+      if ('id' in target) changeEdit({ ...target, body }); else changeDraft({ ...target, body });
+      requestAnimationFrame(() => element.setSelectionRange(selectionStart + text.length, selectionStart + text.length));
+      return;
+    }
+    const restore = { element, start: selectionStart, end: selectionEnd, scroll: element.scrollTop };
+    addImageFiles(files, target, body, restore, text ? selectionStart + text.length : undefined);
   }
-  function addImageFiles(files: File[], target: Draft | (ItemInput & { id: string }), body = target.body) {
+  function addImageFiles(files: File[], target: Draft | (ItemInput & { id: string }), body = target.body, restore?: NonNullable<typeof pasteFocus.current>, caret?: number) {
+    if (actionLock.current) return;
+    if (restore) pasteFocus.current = restore;
     void act(async () => {
       if (!files.length || files.some(file => !imageFileType(file))) throw new Error('Use PNG, JPEG, WebP, BMP, or GIF image files.');
       if ((target.images?.length ?? 0) + files.length > 8) throw new Error('Keep at most 8 images in one item.');
@@ -241,6 +262,7 @@ export function App() {
       const images = [...(target.images ?? []), ...await api.importImages(data)];
       if ('id' in target) changeEdit({ ...target, body, images });
       else changeDraft({ ...target, body, images });
+      if (restore && caret !== undefined) pasteFocus.current = { ...restore, start: caret, end: caret };
     });
   }
   function dragImages(event: DragEvent<HTMLFormElement>) {
@@ -258,7 +280,7 @@ export function App() {
   function imageStrip(images: ImageRef[], remove?: (id: string) => void) {
     if (!images.length) return null;
     return <div className={`image-grid${remove ? ' image-grid-editable' : ''}`}>{images.map((image,index) => <div className="image-attachment" key={image.id}>
-      <button className="image-open" type="button" aria-label={`Open image ${index + 1}`} onClick={event => { event.stopPropagation(); void act(async () => { setModal({ type: 'image', image }); }); }} disabled={busy}><ImagePreview image={image} /></button>
+      <button className="image-open" type="button" aria-label={`Open image ${index + 1}`} onClick={event => { event.stopPropagation(); void act(async () => { await api.openImageViewer(image.id); }); }} disabled={busy}><ImagePreview image={image} /></button>
       {remove && <button className="icon-button image-remove" type="button" aria-label={`Remove image ${index + 1}`} onClick={() => remove(image.id)} disabled={busy}><X size={12} /></button>}
     </div>)}</div>;
   }
@@ -338,7 +360,7 @@ export function App() {
       <form className={`capture-card${draggingImages ? ' drag-over' : ''}`} aria-label="Capture box"
         onDragEnter={dragImages} onDragOver={dragImages} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDraggingImages(false); }} onDrop={dropImages}
         onSubmit={event => { event.preventDefault(); void saveCapture(); }}>
-        <textarea ref={captureRef} aria-label="Capture text" placeholder="An idea, a useful snippet, your next prompt…" value={draft.body} disabled={busy} maxLength={262144}
+        <textarea ref={captureRef} aria-label="Capture text" placeholder="An idea, a useful snippet, your next prompt…" value={draft.body} readOnly={busy} aria-busy={busy} maxLength={262144}
           onPaste={event => pasteImages(event, draft)}
           onChange={event => changeDraft({ ...draft, body: event.target.value })}
           onKeyDown={event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); void saveCapture(); } }} />
@@ -374,11 +396,11 @@ export function App() {
               <button className="icon-button" aria-label={editing?.id === item.id ? 'Save item changes' : 'Edit item'} title={editing?.id === item.id ? 'Save changes' : 'Edit'} disabled={busy} onClick={event => { event.stopPropagation(); if (editing?.id === item.id) saveEdit(); else edit(item); }}>{editing?.id === item.id ? <Check size={14} /> : <Pencil size={14} />}</button>
               <button className="icon-button delete-button" aria-label="Delete item" title="Delete" disabled={busy} onClick={event => { event.stopPropagation(); confirmRemove(item); }}><Trash2 size={14} /></button></div></div>
           {editing?.id === item.id ? <div className="item-editor">
-            <textarea ref={editRef} aria-label="Edit item text" value={editing.body} onPaste={event => pasteImages(event, editing)} onChange={event => changeEdit({ ...editing, body: event.target.value })} disabled={busy} maxLength={262144} />
+            <textarea ref={editRef} aria-label="Edit item text" value={editing.body} onPaste={event => pasteImages(event, editing)} onChange={event => changeEdit({ ...editing, body: event.target.value })} readOnly={busy} aria-busy={busy} maxLength={262144} />
             {imageStrip(editing.images ?? [], id => changeEdit({ ...editing, images: editing.images?.filter(image => image.id !== id) }))}
             <div className="editor-toolbar"><select aria-label="Edit item type" value={editing.kind} onChange={event => changeEdit({ ...editing, kind: event.target.value as 'note' | 'task' })} disabled={busy}><option value="note">Note</option><option value="task">Task</option></select>
               <select aria-label="Move item to project" value={editing.projectId ?? ''} onChange={event => changeEdit({ ...editing, projectId: event.target.value || null })} disabled={busy}>{projectOptions}</select></div></div> :
-            <>{imageStrip(item.images ?? [])}{item.body && <div className="item-body">{item.body}</div>}</>}
+            <>{imageStrip(item.images ?? [])}{item.body && <Suspense fallback={<div className="item-body">{item.body}</div>}><MarkdownBody body={item.body} onError={error => setError(message(error))} /></Suspense>}</>}
         </article>)}
         {!items.length && !loading && <div className="empty-state"><div className="empty-icon">{search ? <Search size={23} /> : <Inbox size={25} strokeWidth={1.5} />}</div><h2>{search ? 'Nothing found just yet' : filter === 'completed' ? 'A fresh start' : 'A little room to think'}</h2><p>{search ? 'Try a different phrase or search all projects.' : filter === 'completed' ? 'Your completed tasks will appear here.' : 'Save a thought above. It’ll be here when you need it.'}</p></div>}
       </div>
@@ -418,8 +440,5 @@ export function App() {
       {dialogError}<div className="dialog-footer"><button ref={deleteCancelRef} disabled={busy} onClick={() => setModal(null)}>Cancel</button><button className="danger" disabled={busy} onClick={() => remove(modal.item)}>Delete item</button></div>
     </Dialog>}
     {modal?.type === 'clipboard' && <Dialog title="Replace this draft?" description="You already have unfinished text. Replace it with the clipboard text?" onClose={() => setModal(null)} busy={busy}><div className="dialog-footer"><button onClick={() => setModal(null)}>Keep draft</button><button className="primary" onClick={() => { changeDraft({ ...draft, body: modal.text }); setModal(null); captureRef.current?.focus(); }}>Replace with clipboard</button></div></Dialog>}
-    {modal?.type === 'image' && <Dialog title="Image" description={`${modal.image.width} × ${modal.image.height} pixels`} onClose={() => setModal(null)} busy={busy} notice={notification}>
-      <ImagePreview image={modal.image} full />{dialogError}<div className="dialog-footer"><button className="primary" disabled={busy} onClick={() => { void act(async () => { await api.copyImage(modal.image.id); setToast({ text: 'Image copied to clipboard' }); }); }}><Copy size={14} /> Copy image</button></div>
-    </Dialog>}
   </main>;
 }

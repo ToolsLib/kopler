@@ -1,5 +1,17 @@
 # MVP validation
 
+## Capture, image viewer, and Markdown follow-up — 26 November 2026
+
+Image paste keeps capture/edit textareas focused throughout processing and preserves selection and scroll position; mixed text/image paste restores the caret after the inserted text. Attachments open in a separate resizable image window, initially up to 1100 × 840, with fit, actual size, zoom, panning, native image copying, independent window controls, and live appearance updates. Saved notes render Markdown while editing and copying retain the original source. HTML is escaped, remote Markdown images are not fetched, and only HTTP/HTTPS links open externally. The selected tab no longer has a top accent line.
+
+All 32 production interface tests passed, including a deliberately delayed image import with no blur, image/text caret placement, a large image viewer resizing/zoom/pan test, exact Markdown round-trips, and unsafe content handling. All 16 Rust tests, three pending-write unit tests, and four release-tool tests passed. Rust formatting and Clippy passed; the local filesystem emitted incremental-cache hard-link warnings. The Windows NSIS installer was rebuilt successfully.
+
+An isolated Windows desktop check confirmed real clipboard image paste with no blur and the original selection retained, exact Markdown clipboard copying, a separate viewer larger than the main window, native resize, zoom, original image copying, independent maximize/restore, live light/dark updates, Escape closing only the viewer, and reopening it. Light/dark viewer and Markdown layouts were inspected. The test restored the original clipboard and window geometry and used a dedicated data directory. Linux/macOS native validation of these changes remains pending.
+
+The updated Windows installer is 2,248,789 bytes; SHA-256: `e1c1cf61eeee1717340f58aaf8476282c223f1d86b8857ff5a82934d35cc0f38`. This local build has not been published as a new GitHub release.
+
+## Initial MVP validation — 13 November 2026
+
 Validated on 13 November 2026. Windows is the first MVP delivery target. macOS validation is deferred at the user's request. Linux has a successful native build and X11 smoke test; Wayland desktop behavior remains a separate validation item.
 
 ## Delivered behavior
@@ -152,7 +164,7 @@ CI follow-up, 14 November: updated fixed-size pixel loops for Rust 1.100 Clippy,
 
 ## Artifact hashes
 
-SHA-256 of the latest Windows artifacts, rebuilt through `npm run release:windows` with the neutral charcoal dark theme, pencil/checkmark item editing, project tab context menus/middle-click removal and conditional confirmation, collapsible search/filter controls, the custom title bar, visible Delete actions and confirmation, image drag/drop, mixed clipboard copying, appearance settings, locally bundled Geist, inbox tabs, and selected-space capture routing (installer size: 2,182,943 bytes). The staged installer at `.release/0.1.0/windows/Kopler_0.1.0_windows_x64-setup.exe` has the same hash:
+Historical SHA-256 of the 13 November Windows artifacts, rebuilt through `npm run release:windows` with the neutral charcoal dark theme, pencil/checkmark item editing, project tab context menus/middle-click removal and conditional confirmation, collapsible search/filter controls, the custom title bar, visible Delete actions and confirmation, image drag/drop, mixed clipboard copying, appearance settings, locally bundled Geist, inbox tabs, and selected-space capture routing (installer size: 2,182,943 bytes). The installer staged at that time under `.release/0.1.0/windows/Kopler_0.1.0_windows_x64-setup.exe` had the same hash:
 
 ```text
 kopler.exe

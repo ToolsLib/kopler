@@ -55,8 +55,8 @@ Capture clipboard reads the current clipboard once, following an explicit action
 ### Keep a clipboard image
 
 1. Copy an image or take a screenshot in another application.
-2. Paste into the capture field or choose **Capture clipboard**. Normal paste also works while editing an item.
-3. Review its thumbnail, optionally add a caption, then save into the selected space. An image-only note or task is valid.
+2. Paste into the capture field or choose **Capture clipboard**. Normal paste also works while editing an item. Image import retains textarea focus, selection, and scroll position; mixed text/image paste places the caret after the inserted text.
+3. Review its thumbnail, optionally add a caption, then save into the selected space. An image-only note or task is valid. Opening a thumbnail uses a separate resizable window, initially up to 1100 × 840, with fit, actual size, zoom, drag-to-pan, and copy controls. Escape closes only that viewer.
 4. Open a thumbnail to view the original and choose **Copy image** to reuse it. The ordinary item copy action publishes text and images together: Windows receives exact Unicode text, a PNG/bitmap for the first image, and rich HTML containing all images. Mixed items also offer **Copy text only** for destinations that prioritize images over text. On macOS/Linux, mixed content uses HTML and a plain-text alternative; standalone images retain native image copying. Receiving apps choose which representations to consume; one-paste text plus image support in Codex is not guaranteed.
 
 Image files can also be dragged onto the capture box, appending attachments without replacing existing text. Validate a batch before importing it, reject mixed unsupported files without partial attachment changes, and block file-navigation drops outside the capture box. Keep the existing image count/size limits and selected-space routing.
@@ -95,7 +95,7 @@ Copying does not complete a task. Completion is reversible. The app does not sim
 - Allow creation, inline editing, copying, moving to another project, and deletion.
 - Show a small pencil action on each item to enter editing; replace it with a checkmark to flush changes and close editing. Item text is selectable and does not enter editing on click. Omit the separate Done button. Keep the editor open on save failure, retaining changes for retry.
 - Tasks can be completed and reopened. Notes have no completion state.
-- Display multiline text without rich editing. Preserve Markdown syntax as literal text and preserve copied content exactly.
+- Store and edit the original text, including Markdown syntax. Render saved items as Markdown with headings, lists, fenced code, tables, and web links; copying preserves the exact source for use in AI desktop apps. Accept plain-text and Markdown clipboard formats. Escape HTML and do not fetch remote Markdown images.
 - Limit each item or draft to 256 KiB of UTF-8 text and eight images, project names to 80 characters, and imports to 64 MiB and 100,000 combined item/project/image records. Show validation errors without clearing the original content.
 - Sort items by creation time, newest first, with a stable tie-breaker. Editing and completion do not change that order.
 - Provide Active, Completed, and All filters. Active includes notes and incomplete tasks; Completed includes completed tasks only.

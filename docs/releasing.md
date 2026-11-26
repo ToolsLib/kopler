@@ -1,6 +1,6 @@
 # Release builds
 
-The release version is currently **0.1.0**. The release tooling prepares native installers and checksums; it does not publish a public release automatically.
+The release version is currently **0.1.1**. The release tooling prepares native installers and checksums; it does not publish a public release automatically.
 
 | Platform | Runner | Download |
 | --- | --- | --- |
@@ -14,17 +14,17 @@ Windows ARM and Linux ARM packages are not included in this initial matrix. The 
 
 The repository is [ToolsLib/kopler](https://github.com/ToolsLib/kopler). Commit and push the workflow files with Actions enabled; the first branch push starts the desktop checks. Hosted results are available in [GitHub Actions](https://github.com/ToolsLib/kopler/actions).
 
-For downloadable test builds, open **Actions → Release builds → Run workflow** on the desired branch. This validates matching versions and release notes, runs unit/storage tests (plus Windows UI tests), builds all three native platforms, verifies both macOS architectures and the app signature, and runs an isolated Linux X11 release smoke check. It uploads per-platform artifacts and a combined `release-candidate-0.1.0` artifact. Artifacts are retained for 30 days. Downloading these artifacts requires repository access; they are not public downloads.
+For downloadable test builds, open **Actions → Release builds → Run workflow** on the desired branch. This validates matching versions and release notes, runs unit/storage tests (plus Windows UI tests), builds all three native platforms, verifies both macOS architectures and the app signature, and runs an isolated Linux X11 release smoke check. It uploads per-platform artifacts and a combined `release-candidate-0.1.1` artifact. Artifacts are retained for 30 days. Downloading these artifacts requires repository access; they are not public downloads.
 
 To create a draft GitHub Release, tag the reviewed commit after updating all versions and release notes:
 
 ```sh
 npm run release:check
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
-The workflow rejects a tag that differs from the app version. After every platform succeeds, it collects exactly four installers and writes a combined `SHA256SUMS.txt`, then creates a **draft** release using `docs/releases/v0.1.0.md`. Rerunning can refresh an existing draft; it refuses to modify an already published release. A manual run always produces artifacts only, including when run against a tag.
+The workflow rejects a tag that differs from the app version. After every platform succeeds, it collects exactly four installers and writes a combined `SHA256SUMS.txt`, then creates a **draft** release using `docs/releases/v0.1.1.md`. Rerunning can refresh an existing draft; it refuses to modify an already published release. A manual run always produces artifacts only, including when run against a tag.
 
 Review the draft's artifacts, signing status, release notes, and native platform behavior before manually publishing it. macOS building happens on the hosted Mac runner; a Mac is not needed on the Windows development machine. Compiling is not a claim that native desktop behavior has been validated on that platform.
 
@@ -81,4 +81,4 @@ sha256sum --check SHA256SUMS.txt  # Linux
 shasum -a 256 --check SHA256SUMS.txt  # macOS
 ```
 
-On Windows, compare `(Get-FileHash .\Kopler_0.1.0_windows_x64-setup.exe -Algorithm SHA256).Hash` against its entry in `SHA256SUMS.txt`. Checksums detect file changes; they do not replace publisher signatures.
+On Windows, compare `(Get-FileHash .\Kopler_0.1.1_windows_x64-setup.exe -Algorithm SHA256).Hash` against its entry in `SHA256SUMS.txt`. Checksums detect file changes; they do not replace publisher signatures.

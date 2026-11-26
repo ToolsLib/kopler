@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 // UI tests use the real invoke boundary with an isolated in-browser native adapter.
 // Storage invariants and transactions are tested independently against real SQLite in Rust.
 export async function desktopMock(page: Page) {
-  await page.addInitScript(() => {
+  await page.context().addInitScript(() => {
     type RecordValue = Record<string, any>;
     const saved = localStorage.getItem('test-native-state');
     const state: RecordValue = saved ? JSON.parse(saved) : {
@@ -30,6 +30,17 @@ export async function desktopMock(page: Page) {
       async invoke(command: string, args: RecordValue = {}) {
         if (command === 'plugin:event|listen') { events[args.event] = args.handler; return args.handler; }
         if (command === 'plugin:event|unlisten' || command === 'ready') return;
+        if (command === 'open_image_viewer') {
+          w.testNative.viewerOptions = {width:1100,height:840,resizable:true};
+          w.testNative.viewer = window.open('/?image=' + encodeURIComponent(args.id), 'image-viewer', 'popup,width=1100,height=840,resizable=yes');
+          return;
+        }
+        if (command === 'image_viewer_info') {
+          const decoded = new Image(); decoded.src = state.images[args.id]; await decoded.decode();
+          return {image:{id:args.id,width:decoded.naturalWidth,height:decoded.naturalHeight},theme:state.preferences.theme};
+        }
+        if (command === 'close_image_viewer') { window.close(); return; }
+        if (command === 'open_external_url') { w.testNative.openedUrl = args.url; return; }
         if (command === 'window_state') return w.testNative.window;
         if (command === 'window_control') {
           w.testNative.windowActions.push(args.action);
@@ -69,6 +80,7 @@ export async function desktopMock(page: Page) {
         }
         else if (command === 'copy_item_text') { w.testNative.copied=state.items.find((item: RecordValue)=>item.id===args.id).body; w.testNative.copiedImage='';w.testNative.copiedImages=[]; }
         else if (command === 'read_clipboard' || command === 'import_images') {
+          if (command === 'import_images' && w.testNative.importDelay) await new Promise(resolve => setTimeout(resolve, w.testNative.importDelay));
           const dataUrls = command === 'import_images' ? args.dataUrls : w.testNative.clipboardImage ? [w.testNative.clipboardImage] : [];
           const images = [];
           for (const data of dataUrls) {

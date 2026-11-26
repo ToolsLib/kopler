@@ -19,7 +19,7 @@ Create a release executable and an unsigned installer:
 npm run release:windows
 ```
 
-The installer and checksum are staged in `.release/0.1.0/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
+The installer and checksum are staged in `.release/0.1.1/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
 
 `npm run dev` alone opens the interface in a browser, which deliberately has no access to desktop data. Use the Tauri command for the working application.
 
@@ -30,7 +30,7 @@ The installer and checksum are staged in `.release/0.1.0/windows/`; the original
 - Type or paste text/images and press **Ctrl+Enter** or **Command+Enter** to save. Notes and tasks always go into the currently selected Inbox or project, including when All projects is enabled.
 - Creating a project switches browsing and capture to it immediately, keeps your draft text, and remembers the selection after restart.
 - Switch inboxes using the browser-style tabs above search. The strip scrolls horizontally when needed; Left/Right and Home/End move tab focus, and Enter or Space selects a tab. Use + to add an inbox. Right-click a project tab to rename/delete it, or middle-click to remove it. Empty projects close immediately; projects containing items or an unfinished draft ask for confirmation and move their contents to Inbox. Inbox cannot be removed.
-- **Capture clipboard** reads text or an image when clicked. Images append to the draft and keep its caption; replacing nonempty text requires confirmation. Normal image paste works in both capture and inline editing. Images can be saved without text.
+- **Capture clipboard** reads text or an image when clicked. Images append to the draft and keep its caption; replacing nonempty text requires confirmation. Normal image paste works in both capture and inline editing, retaining focus and the text selection. Images can be saved without text.
 - Drag image files onto the capture box to append them without replacing the caption. Drop multiple files together; unsupported files reject the entire drop and preserve the existing draft.
 - Click an image thumbnail to view it and **Copy image** to reuse it. On Windows, **Copy item** publishes exact plain text, the first image as PNG/bitmap, and rich HTML containing all images together. Mixed items also offer **Copy text only**. A receiving app may choose just the image or text; if so, paste the image first and then use Copy text only to add the caption. Remove an attachment using its × button while editing.
 - Search and filters start collapsed. Toggle them with the search icon beside the inbox tabs, or use **Ctrl+F** / **Command+F** to reveal and focus search. Collapsing preserves the current query and filters; a dot on the toggle marks active filtering. Select the Items region to navigate with arrow keys, Enter to edit, or Ctrl+C/Command+C to copy the selected item.
@@ -40,7 +40,9 @@ The installer and checksum are staged in `.release/0.1.0/windows/`; the original
 - Close or Escape hides the window. Use the tray menu or **Settings → Quit Kopler** to exit.
 - The Settings button at the bottom right provides JSON export/import and access to the local data directory. No account, network service, clipboard history, or AI connection is used.
 
-Items are limited to 256 KiB of UTF-8 text and eight images (each at most 8 MiB as PNG and 16 megapixels). Pasted JPEG, WebP, BMP, and GIF files are normalized to still PNG images. Project names are limited to 80 characters and import files to 64 MiB/100,000 records, including image records. Text is rendered literally. Storage and exports are not encrypted. Deleted items have a 10-second Undo window during the current session.
+Items are limited to 256 KiB of UTF-8 text and eight images (each at most 8 MiB as PNG and 16 megapixels). Pasted JPEG, WebP, BMP, and GIF files are normalized to still PNG images. Project names are limited to 80 characters and import files to 64 MiB/100,000 records, including image records. Saved text renders as Markdown (headings, lists, fenced code, tables, and links); editing and copying retain the exact original source. HTML is escaped, remote Markdown images are not loaded, and only HTTP/HTTPS links open externally. Storage and exports are not encrypted. Deleted items have a 10-second Undo window during the current session.
+
+Click an attached image to open a separate, resizable viewer (initially up to 1100 × 840). Use Fit, 100%, or the zoom buttons; drag to pan when zoomed. Ctrl/Command + scroll or +/- zooms, Ctrl/Command+0 fits, Ctrl/Command+1 shows actual size, and Escape closes just the viewer. Its Copy image button copies the original image.
 
 ## Data and recovery
 

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Only the main local window can receive application lifecycle events.",
-  "windows": ["main"],
+  "description": "Local application windows can listen for appearance and window state events.",
+  "windows": ["main", "image-viewer"],
   "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize"]
 }

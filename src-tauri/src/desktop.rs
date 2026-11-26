@@ -69,6 +69,100 @@ fn native_theme(theme: store::ThemePreference) -> Option<tauri::Theme> {
     }
 }
 
+#[derive(Serialize)]
+struct ImageViewerInfo {
+    image: ImageRef,
+    theme: store::ThemePreference,
+}
+
+#[tauri::command]
+async fn image_viewer_info(app: AppHandle, id: String) -> store::Result<ImageViewerInfo> {
+    database(app, move |db| {
+        Ok(ImageViewerInfo {
+            image: db.image_reference(&id)?,
+            theme: db.preferences()?.theme,
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+async fn open_image_viewer(app: AppHandle, id: String) -> store::Result<()> {
+    let info = image_viewer_info(app.clone(), id).await?;
+    if let Some(viewer) = app.get_webview_window("image-viewer") {
+        let mut url = viewer.url().map_err(|error| error.to_string())?;
+        let query = format!("image={}", info.image.id);
+        if url.query() != Some(query.as_str()) {
+            url.set_query(Some(&query));
+            viewer.navigate(url).map_err(|error| error.to_string())?;
+        }
+        viewer.unminimize().map_err(|error| error.to_string())?;
+        viewer.show().map_err(|error| error.to_string())?;
+        return viewer.set_focus().map_err(|error| error.to_string());
+    }
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        "image-viewer",
+        tauri::WebviewUrl::App(format!("index.html?image={}", info.image.id).into()),
+    )
+    .title("Image · Kopler")
+    .decorations(false)
+    .resizable(true)
+    .inner_size(1100.0, 840.0)
+    .min_inner_size(360.0, 300.0)
+    .center()
+    .theme(native_theme(info.theme));
+    if let Some(main) = app.get_webview_window("main") {
+        if let Ok(Some(monitor)) = main.current_monitor() {
+            let factor = monitor.scale_factor();
+            let size = monitor.size().to_logical::<f64>(factor);
+            builder = builder.inner_size(
+                1100.0_f64.min(size.width - 40.0).max(360.0),
+                840.0_f64.min(size.height - 80.0).max(300.0),
+            );
+        }
+        builder = builder.parent(&main).map_err(|error| error.to_string())?;
+    }
+    let viewer = builder.build().map_err(|error| error.to_string())?;
+    let resource = viewer.clone();
+    viewer.on_window_event(move |event| {
+        if matches!(
+            event,
+            tauri::WindowEvent::Focused(_) | tauri::WindowEvent::Resized(_)
+        ) {
+            if let Ok(state) = current_window_state(&resource) {
+                let _ = resource.emit_to("image-viewer", "window-state", state);
+            }
+        }
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            if let Some(main) = resource.app_handle().get_webview_window("main") {
+                // Closing the viewer must not move the capture caret or hide the app.
+                let _ = main.set_focus();
+            }
+        }
+    });
+    viewer.set_focus().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn close_image_viewer(window: tauri::WebviewWindow) -> store::Result<()> {
+    if window.label() != "image-viewer" {
+        return Err("This is not an image viewer.".into());
+    }
+    window.close().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn open_external_url(app: AppHandle, url: String) -> store::Result<()> {
+    let parsed = tauri::Url::parse(&url).map_err(|_| "Invalid link.".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return Err("Only web links can be opened from a note.".into());
+    }
+    app.opener()
+        .open_url(parsed.as_str(), None::<&str>)
+        .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 async fn bootstrap(app: AppHandle) -> store::Result<InitialState> {
     let data = database(app.clone(), |db| db.bootstrap()).await?;
@@ -284,6 +378,7 @@ async fn set_theme(app: AppHandle, theme: store::ThemePreference) -> store::Resu
     })
     .await?;
     app.set_theme(native_theme(theme));
+    let _ = app.emit("appearance-changed", theme);
     Ok(())
 }
 
@@ -712,7 +807,7 @@ pub fn run() {
                     if let tauri::WindowEvent::CloseRequested {api,..}=event {api.prevent_close();request_action(&handle,"hide");}
                     if let tauri::WindowEvent::Focused(focused)=event {set_low_memory(&resource_window,!focused);}
                     if matches!(event,tauri::WindowEvent::Focused(_) | tauri::WindowEvent::Resized(_)) {
-                        if let Ok(state)=current_window_state(&resource_window) { let _=resource_window.emit("window-state",state); }
+                        if let Ok(state)=current_window_state(&resource_window) { let _=resource_window.emit_to("main","window-state",state); }
                     }
                 });
                 // Show a recoverable interface even if frontend initialization fails.
@@ -720,7 +815,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![bootstrap,list_items,create_item,update_item,complete_item,delete_item,undo_delete,create_project,rename_project,delete_project,save_draft,save_view,read_clipboard,import_images,read_image,copy_image,copy_item,copy_item_text,set_shortcut,set_theme,export_data,import_data,open_data_directory,ready,window_state,window_control,finish_window_action])
+        .invoke_handler(tauri::generate_handler![image_viewer_info,open_image_viewer,close_image_viewer,open_external_url,bootstrap,list_items,create_item,update_item,complete_item,delete_item,undo_delete,create_project,rename_project,delete_project,save_draft,save_view,read_clipboard,import_images,read_image,copy_image,copy_item,copy_item_text,set_shortcut,set_theme,export_data,import_data,open_data_directory,ready,window_state,window_control,finish_window_action])
         .build(tauri::generate_context!())
         .expect("Could not initialize the desktop application");
     application.run(|app, event| {

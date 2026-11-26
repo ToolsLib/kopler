@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { desktopMock } from './desktop-mock';
 
 async function pasteImage(page: Page, target = 'Capture text', count = 1, type = 'image/png') {
+  await page.getByLabel(target, {exact:true}).focus();
   return page.getByLabel(target, {exact:true}).evaluate((element, {count,type}) => {
     const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 180;
     const context = canvas.getContext('2d')!;
@@ -18,11 +19,28 @@ async function pasteImage(page: Page, target = 'Capture text', count = 1, type =
 
 test.beforeEach(async ({page})=>{await desktopMock(page);await page.goto('/');await expect(page.getByLabel('Capture text')).toBeVisible();});
 
+test('image import keeps the capture textarea focused throughout processing', async ({page}) => {
+  await page.getByLabel('Capture text').fill('Keep the caret here');
+  await page.getByLabel('Capture text').evaluate(element => {
+    (window as any).testNative.importDelay = 500;
+    (window as any).captureBlurCount = 0;
+    element.addEventListener('blur', () => (window as any).captureBlurCount++);
+    (element as HTMLTextAreaElement).setSelectionRange(5, 8);
+  });
+  await pasteImage(page);
+  await expect(page.getByLabel('Capture text')).toBeFocused();
+  await expect(page.locator('.capture-card img')).toHaveCount(1);
+  await expect(page.getByLabel('Capture text')).toBeFocused();
+  expect(await page.evaluate(() => (window as any).captureBlurCount)).toBe(0);
+  expect(await page.getByLabel('Capture text').evaluate(element => [(element as HTMLTextAreaElement).selectionStart, (element as HTMLTextAreaElement).selectionEnd])).toEqual([5, 8]);
+});
+
 test('pasted images retain captions and survive draft recovery, space switching, editing, and copying', async ({page})=>{
   await page.getByLabel('Capture text').fill('A caption worth keeping');
   const png=await pasteImage(page);
   await expect(page.locator('.capture-card img')).toHaveCount(1);
   await expect(page.getByLabel('Capture text')).toHaveValue('A caption worth keeping');
+  await expect(page.getByLabel('Capture text')).toBeFocused();
   await expect(page.locator('.save-status')).toBeEmpty();
   await page.reload();
   await expect(page.locator('.capture-card img')).toHaveCount(1);
@@ -45,15 +63,25 @@ test('pasted images retain captions and survive draft recovery, space switching,
   await page.getByRole('button',{name:'Copy text only',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copiedImage)).toBe('');
   await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copied)).toBe('A caption worth keeping');
+  const opened = page.waitForEvent('popup');
   await page.getByRole('button',{name:'Open image 1',exact:true}).click();
-  await expect(page.getByRole('dialog').getByAltText('Attached image')).toBeVisible();
-  await page.getByRole('button',{name:'Copy image',exact:true}).click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).testNative.copiedImage)).toBe(png);
-  await page.getByRole('button',{name:'Close dialog',exact:true}).click();
+  const viewer = await opened;
+  await expect(viewer.getByAltText('Attached image')).toBeVisible();
+  await expect(viewer.getByLabel('Zoom level')).toHaveText('100%');
+  await viewer.setViewportSize({width:1100,height:840});
+  await viewer.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await expect(viewer.getByLabel('Zoom level')).toHaveText('125%');
+  await viewer.getByRole('button',{name:'Actual size',exact:true}).click();
+  await expect(viewer.getByLabel('Zoom level')).toHaveText('100%');
+  await viewer.getByRole('button',{name:'Copy image',exact:true}).click();
+  await expect.poll(()=>viewer.evaluate(()=>(window as any).testNative.copiedImage)).toBe(png);
+  await viewer.getByRole('button',{name:'Close window',exact:true}).click();
+  await expect.poll(()=>viewer.isClosed()).toBe(true);
   await page.getByRole('button',{name:'Edit item',exact:true}).click();
   await page.getByRole('button',{name:'Remove image 2',exact:true}).click();
   await pasteImage(page,'Edit item text');
   await expect(page.locator('.item-editor img')).toHaveCount(2);
+  await expect(page.getByLabel('Edit item text')).toBeFocused();
   await page.getByRole('button',{name:'Save item changes',exact:true}).click();
   await page.reload();
   await expect(page.locator('.item img')).toHaveCount(2);
@@ -112,6 +140,7 @@ test('failed image paste and attachment limits preserve the existing draft', asy
   await page.evaluate(()=>{(window as any).testNative.failSave=true;});
   await pasteImage(page);
   await expect(page.getByRole('alert')).toContainText('Storage is full');
+  await expect(page.getByLabel('Capture text')).toBeFocused();
   await expect(page.locator('.capture-card img')).toHaveCount(1);
   await expect(page.getByLabel('Capture text')).toHaveValue('Keep this draft');
   await page.evaluate(()=>{(window as any).testNative.failSave=false;});
@@ -161,7 +190,7 @@ test('dropping images preserves the draft, saves in the selected space, and reje
 test('mixed clipboard paste keeps both text and image at the text selection', async ({page})=>{
   await page.getByLabel('Capture text').fill('Before REPLACE after');
   await page.getByLabel('Capture text').evaluate(element=>{
-    const input=element as HTMLTextAreaElement;input.setSelectionRange(7,14);
+    const input=element as HTMLTextAreaElement;input.focus();input.setSelectionRange(7,14);
     const canvas=document.createElement('canvas');canvas.width=30;canvas.height=20;
     const bytes=Uint8Array.from(atob(canvas.toDataURL().split(',')[1]),letter=>letter.charCodeAt(0));
     const clipboardData=new DataTransfer();clipboardData.setData('text/plain','caption');
@@ -170,4 +199,41 @@ test('mixed clipboard paste keeps both text and image at the text selection', as
   });
   await expect(page.locator('.capture-card img')).toHaveCount(1);
   await expect(page.getByLabel('Capture text')).toHaveValue('Before caption after');
+  await expect(page.getByLabel('Capture text')).toBeFocused();
+  await expect.poll(()=>page.getByLabel('Capture text').evaluate(element=>(element as HTMLTextAreaElement).selectionStart)).toBe(14);
+  await page.getByLabel('Capture text').press('!');
+  await expect(page.getByLabel('Capture text')).toHaveValue('Before caption! after');
+});
+
+test('a large image fits a resized viewer and supports keyboard zoom and panning', async ({page}) => {
+  await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 2400; canvas.height = 1600;
+    (window as any).testNative.clipboardImage = canvas.toDataURL();
+  });
+  await page.getByRole('button', {name:'Capture clipboard',exact:true}).click();
+  const opened = page.waitForEvent('popup');
+  await page.getByRole('button', {name:'Open image 1',exact:true}).click();
+  const viewer = await opened;
+  await expect(viewer.getByAltText('Attached image')).toBeVisible();
+  await viewer.setViewportSize({width:1000,height:760});
+  const before = await viewer.getByAltText('Attached image').boundingBox();
+  await viewer.setViewportSize({width:600,height:440});
+  await expect.poll(async () => (await viewer.getByAltText('Attached image').boundingBox())!.width).toBeLessThan(before!.width);
+  await viewer.getByRole('button', {name:'Actual size',exact:true}).click();
+  await expect(viewer.getByLabel('Zoom level')).toHaveText('100%');
+  await expect.poll(() => viewer.getByAltText('Attached image').evaluate(image => image.clientWidth)).toBe(2400);
+  await viewer.getByLabel('Image canvas').focus();
+  await viewer.keyboard.press('Control+=');
+  await expect(viewer.getByLabel('Zoom level')).toHaveText('125%');
+  const canvas = viewer.getByLabel('Image canvas');
+  await canvas.evaluate(element => { element.scrollLeft = 100; element.scrollTop = 100; });
+  const bounds = (await canvas.boundingBox())!;
+  await viewer.mouse.move(bounds.x + 150, bounds.y + 150);
+  await viewer.mouse.down(); await viewer.mouse.move(bounds.x + 70, bounds.y + 70); await viewer.mouse.up();
+  await expect.poll(() => canvas.evaluate(element => element.scrollLeft)).toBeGreaterThan(100);
+  await viewer.keyboard.press('Control+0');
+  await expect(viewer.getByRole('button', {name:'Fit image',exact:true})).toHaveAttribute('aria-pressed','true');
+  await viewer.keyboard.press('Escape').catch(error => { if (!viewer.isClosed()) throw error; });
+  await expect.poll(() => viewer.isClosed()).toBe(true);
+  await expect(page.getByLabel('Capture text')).toBeVisible();
 });
