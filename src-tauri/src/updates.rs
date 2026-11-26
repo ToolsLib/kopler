@@ -26,7 +26,19 @@ struct Progress {
 
 pub fn can_install() -> bool {
     !cfg!(debug_assertions)
-        && (!cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_some())
+        && supports_bundle(
+            tauri::utils::platform::bundle_type(),
+            std::env::var_os("APPIMAGE").is_some(),
+        )
+}
+
+fn supports_bundle(bundle: Option<tauri::utils::config::BundleType>, appimage: bool) -> bool {
+    use tauri::utils::config::BundleType;
+    match bundle {
+        Some(BundleType::Nsis | BundleType::Msi | BundleType::App | BundleType::Dmg) => true,
+        Some(BundleType::AppImage) => appimage,
+        _ => false,
+    }
 }
 
 fn main_only(window: &WebviewWindow) -> Result<(), String> {
@@ -34,6 +46,23 @@ fn main_only(window: &WebviewWindow) -> Result<(), String> {
         return Err("Updates are managed in the main window.".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::supports_bundle;
+    use tauri::utils::config::BundleType;
+
+    #[test]
+    fn inherited_appimage_environment_does_not_enable_other_package_types() {
+        assert!(!supports_bundle(Some(BundleType::Deb), true));
+        assert!(!supports_bundle(Some(BundleType::Rpm), true));
+        assert!(!supports_bundle(None, true));
+        assert!(!supports_bundle(Some(BundleType::AppImage), false));
+        assert!(supports_bundle(Some(BundleType::AppImage), true));
+        assert!(supports_bundle(Some(BundleType::Nsis), false));
+        assert!(supports_bundle(Some(BundleType::App), false));
+    }
 }
 
 #[tauri::command]
