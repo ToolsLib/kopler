@@ -78,6 +78,53 @@ test('delete confirmation preserves edits on cancel and failure, and permits ret
   await expect(page.locator('.item-body')).toHaveText('Latest edit before deletion');
 });
 
+for (const kind of ['Note','Task'] as const) {
+  test(`Ctrl-click deletes a ${kind.toLowerCase()} immediately and Undo restores it`, async ({page}) => {
+    await page.getByLabel('Capture text').fill(`Quick delete ${kind}`);
+    await page.getByRole('button',{name:kind,exact:true}).click();
+    await page.getByLabel('Capture text').press('Control+Enter');
+    const remove = page.getByRole('button',{name:'Delete item',exact:true});
+    await expect(remove).toHaveAttribute('title','Delete (Ctrl+click to skip confirmation)');
+    await remove.click({modifiers:['Control']});
+    await expect(page.locator('.item')).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.getByRole('button',{name:'Undo',exact:true}).click();
+    await expect(page.locator('.item-body')).toHaveText(`Quick delete ${kind}`);
+  });
+}
+
+test('quick deletion preserves pending edits on failure and restores them with Undo after retry', async ({page}) => {
+  await page.getByLabel('Capture text').fill('Original note');
+  await page.getByLabel('Capture text').press('Control+Enter');
+  await page.getByRole('button',{name:'Edit item',exact:true}).click();
+  await page.evaluate(() => { (window as any).testNative.failSave = true; });
+  await page.getByLabel('Edit item text').fill('Latest edit before quick deletion');
+  await page.getByRole('button',{name:'Delete item',exact:true}).click({modifiers:['Control']});
+  await expect(page.getByRole('alert')).toContainText('Storage is full');
+  await expect(page.getByLabel('Edit item text')).toHaveValue('Latest edit before quick deletion');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.evaluate(() => { (window as any).testNative.failSave = false; });
+  await page.getByRole('button',{name:'Delete item',exact:true}).click({modifiers:['Control']});
+  await expect(page.locator('.item')).toHaveCount(0);
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await expect(page.locator('.item-body')).toHaveText('Latest edit before quick deletion');
+});
+
+test('macOS quick deletion uses Command while Control keeps confirmation', async ({page}) => {
+  await page.addInitScript(() => { Object.defineProperty(navigator,'platform',{get:()=>'MacIntel'}); });
+  await page.reload();
+  await page.getByLabel('Capture text').fill('Command-click note');
+  await page.getByLabel('Capture text').press('Meta+Enter');
+  await page.getByRole('button',{name:'Delete item',exact:true}).click({modifiers:['Control']});
+  await expect(page.getByRole('dialog',{name:'Delete this note?'})).toBeVisible();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.getByRole('button',{name:'Delete item',exact:true}).click({modifiers:['Meta']});
+  await expect(page.locator('.item')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await expect(page.locator('.item-body')).toHaveText('Command-click note');
+});
+
 test('draft persists across restart and clipboard replacement requires confirmation', async ({ page }) => {
   await page.getByLabel('Capture text').fill('Unfinished draft');
   await expect(page.locator('.save-status')).toBeEmpty();

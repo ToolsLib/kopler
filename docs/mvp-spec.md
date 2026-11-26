@@ -100,7 +100,7 @@ Copying does not complete a task. Completion is reversible. The app does not sim
 - Sort items by creation time, newest first, with a stable tie-breaker. Editing and completion do not change that order.
 - Provide Active, Completed, and All filters. Active includes notes and incomplete tasks; Completed includes completed tasks only.
 - Open with All selected by default, including when reopening a saved space. Keep All on the right of the filter group. Users can switch to Active or Completed during the session; completed tasks remain searchable when the current filter includes them.
-- Show Delete directly on each item, including outside editing. Require confirmation before deletion, with Cancel initially focused; Cancel or Escape preserves the item and pending edits. Failed deletion keeps the dialog open with an error and permits retry. Confirmed deletion offers Undo for 10 seconds during the running session. Deletion is final after that interval or application exit; no Trash view is included.
+- Show Delete directly on each item, including outside editing. Normal clicks require confirmation, with Cancel initially focused; Cancel or Escape preserves the item and pending edits. Ctrl-click (Command-click on macOS) bypasses confirmation for that item. Both paths flush pending edits before deleting and offer Undo for 10 seconds during the running session. Failed deletion retains the item and permits retry; the normal confirmation dialog stays open on failure. Deletion is final after the Undo interval or application exit; no Trash view is included.
 
 ### Projects and Inbox
 

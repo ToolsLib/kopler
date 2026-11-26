@@ -19,7 +19,7 @@ Create a release executable and an unsigned installer:
 npm run release:windows
 ```
 
-The installer and checksum are staged in `.release/0.1.2/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
+The installer and checksum are staged in `.release/0.1.3/windows/`; the original installer remains in `src-tauri/target/release/bundle/nsis/`. It provisions WebView2 if necessary; a runtime download is separate from the installer size. See [release instructions](docs/releasing.md) for GitHub Actions, local builds on every platform, signing, and creating a draft release.
 
 `npm run dev` alone opens the interface in a browser, which deliberately has no access to desktop data. Use the Tauri command for the working application.
 
@@ -36,7 +36,7 @@ The installer and checksum are staged in `.release/0.1.2/windows/`; the original
 - Search and filters start collapsed. Toggle them with the search icon beside the inbox tabs, or use **Ctrl+F** / **Command+F** to reveal and focus search. Collapsing preserves the current query and filters; a dot on the toggle marks active filtering. Select the Items region to navigate with arrow keys, Enter to edit, or Ctrl+C/Command+C to copy the selected item.
 - **All** is the default filter when opening the app or creating a project. Use Active or Completed to narrow the list during the session.
 - Use an item's pencil icon to edit; it becomes a checkmark to save changes and close the editor. Item text stays selectable without opening editing. Editing autosaves; the checkmark, hiding, and quitting wait for pending writes. Failed saves keep the editor and text available for retry.
-- The Delete icon is always visible on each item. Confirm deletion in the dialog; Cancel and Escape keep the item. Confirmed deletion still offers Undo for 10 seconds.
+- The Delete icon is always visible on each item. A normal click asks for confirmation; Cancel and Escape keep the item. Ctrl-click (Command-click on macOS) deletes immediately. Both paths save pending edits first and offer Undo for 10 seconds.
 - Close or Escape hides the window. Use the tray menu or **Settings → Quit Kopler** to exit.
 - The Settings button at the bottom right provides JSON export/import, access to the local data directory, and update checks. Notes stay local; no account, sync, clipboard history, or AI connection is used.
 - Starting with 0.1.2, Kopler checks public GitHub Releases on startup and every six hours, without taking capture focus. Settings lets you disable automatic checks, check manually, and install a verified update with **Install and restart**. Drafts and edits are saved before installation; failed saves or signature checks prevent it. Windows/macOS installations and Linux AppImages support in-app updates; DEB installations use the package download. Install 0.1.2 manually once when upgrading from an older version.
