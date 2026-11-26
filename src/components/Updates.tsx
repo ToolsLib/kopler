@@ -59,8 +59,9 @@ export function UpdateSettings({ updates, version, automatic, canInstall, busy, 
     <div className="button-row">
       <button disabled={busy || checking || !!progress} onClick={() => { void updates.check(); }}><RefreshCw size={14} /> Check for updates</button>
       {available && canInstall && <button className="primary" disabled={busy || checking || !!progress} onClick={onInstall}><ArrowDownToLine size={14} /> Install and restart</button>}
-      {available && <button disabled={busy || !!progress} onClick={() => { void api.openUrl(`https://github.com/ToolsLib/kopler/releases/tag/v${available.version}`).catch(onError); }}>{canInstall ? 'Release notes' : 'Download update'}</button>}
+      {available && !canInstall && <button disabled={busy || !!progress} onClick={() => { void api.openUrl(`https://github.com/ToolsLib/kopler/releases/tag/v${available.version}`).catch(onError); }}>Download update</button>}
     </div>
+    {available && canInstall && <p className="field-help"><button className="text-button" disabled={busy || !!progress} onClick={() => { void api.openUrl(`https://github.com/ToolsLib/kopler/releases/tag/v${available.version}`).catch(onError); }}>Release notes</button></p>}
     {available && !canInstall && <p className="field-help">In-app installation is supported by installed Windows/macOS builds and Linux AppImages. Update this build using its package.</p>}
   </div>;
 }
